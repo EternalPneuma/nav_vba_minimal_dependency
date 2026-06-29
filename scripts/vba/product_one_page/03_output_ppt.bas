@@ -5,7 +5,7 @@ Option Explicit
 Private Const TARGET_FILE_SUFFIX As String = "-产品一页通.xlsx"
 Private Const TARGET_FILE_PATTERN As String = "*-产品一页通.xlsx"
 
-Private Const PPT_TEMPLATE_FILE As String = "产品一页通-交鑫致远-模板.pptx"
+Private Const PPT_TEMPLATE_FILE As String = "assets\产品一页通-交鑫致远-模板.pptx"
 Private Const OUTPUT_FILE_PREFIX As String = "产品一页通-交鑫致远-"
 Private Const PPTX_EXTENSION As String = ".pptx"
 Private Const PDF_EXTENSION As String = ".pdf"

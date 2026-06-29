@@ -15,6 +15,8 @@ Private Const SHEET_NAV_DATA_ALIAS As String = "绘制净值数据"
 Private Const COLOR_BLUE As String = "#19449A"
 Private Const FONT_NAME As String = "微软雅黑"
 
+Private Const ASSET_IMAGE_FOLDER As String = "assets\images"
+
 Private Const TITLE_FONT_SIZE As Long = 36
 Private Const SUBTITLE_FONT_SIZE As Long = 20
 Private Const NORMAL_FONT_SIZE As Long = 18
@@ -213,7 +215,7 @@ Private Sub BuildTopTitle(ByVal ws As Worksheet, ByVal rowNo As Long, ByVal prod
     titleRange.Value = ""
     
     Dim bgPath As String
-    bgPath = ThisWorkbook.Path & "\background.png"
+    bgPath = AssetImagePath("background.png")
     
     Dim pic As Shape
     If FileExists(bgPath) Then
@@ -270,7 +272,7 @@ End Sub
 
 Private Sub InsertTitleLogo(ByVal ws As Worksheet, ByVal rowNo As Long)
     Dim logoPath As String
-    logoPath = ThisWorkbook.Path & "\logo_white.png"
+    logoPath = AssetImagePath("logo_white.png")
     If Not FileExists(logoPath) Then Exit Sub
     
     Dim logoCell As Range
@@ -632,6 +634,13 @@ Private Sub ReadPerformanceMetrics(ByVal wsProduct As Worksheet, _
         End If
     End If
 End Sub
+
+
+Private Function AssetImagePath(ByVal imageName As String) As String
+    AssetImagePath = ThisWorkbook.Path & Application.PathSeparator & _
+                     Replace(ASSET_IMAGE_FOLDER, "\", Application.PathSeparator) & _
+                     Application.PathSeparator & imageName
+End Function
 
 
 Private Function CalcAnnualYieldFromNavSeries(ByVal currentNav As Double, ByVal currentDate As Date, _

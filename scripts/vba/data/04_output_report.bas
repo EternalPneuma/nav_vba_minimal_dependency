@@ -5,6 +5,7 @@ Option Explicit
 Private Const SOURCE_FILE_SUFFIX As String = "-上层产品分类表现.xlsx"
 Private Const OUTPUT_FILE_SUFFIX As String = "-产品收益展示.xlsx"
 Private Const TITLE_IMAGE_NAME As String = "title.png"
+Private Const ASSET_IMAGE_FOLDER As String = "assets\images"
 
 Private Const PRODUCT_CATEGORY_SHEET_NAME As String = "产品分类"
 Private Const CAT_STABLE As String = "稳享长期限"
@@ -1247,7 +1248,7 @@ End Sub
 
 Private Sub AddYuanRongLogoIfExists(ByVal ws As Worksheet)
     Dim logoPath As String
-    logoPath = ThisWorkbook.Path & Application.PathSeparator & "logo.png"
+    logoPath = AssetImagePath("logo.png")
     If Dir(logoPath) = vbNullString Then Exit Sub
 
     Dim targetCell As Range
@@ -1289,7 +1290,7 @@ End Sub
 
 Private Sub AddTitleImageIfExists(ByVal ws As Worksheet)
     Dim imagePath As String
-    imagePath = ThisWorkbook.Path & Application.PathSeparator & TITLE_IMAGE_NAME
+    imagePath = AssetImagePath(TITLE_IMAGE_NAME)
     If Dir(imagePath) = vbNullString Then Exit Sub
 
     Dim targetRange As Range
@@ -1320,6 +1321,12 @@ Private Sub AddTitleImageIfExists(ByVal ws As Worksheet)
     shp.Top = targetRange.Top
     shp.Placement = xlMove
 End Sub
+
+Private Function AssetImagePath(ByVal imageName As String) As String
+    AssetImagePath = ThisWorkbook.Path & Application.PathSeparator & _
+                     Replace(ASSET_IMAGE_FOLDER, "\", Application.PathSeparator) & _
+                     Application.PathSeparator & imageName
+End Function
 
 Private Function InsertChartImagesIntoDisplay(ByVal wbOutput As Workbook, ByVal dbPath As String, ByVal baselineKey As String) As String
     Dim imgKey As String

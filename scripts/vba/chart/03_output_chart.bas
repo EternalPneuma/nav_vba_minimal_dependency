@@ -40,10 +40,10 @@ Public Sub Chart03_GenerateCharts()
     
     '--- 1. 检查4个模板文件 ---
     Dim tplPaths(1 To 4) As String
-    tplPaths(1) = dbPath & TPL_NAV_RED
-    tplPaths(2) = dbPath & TPL_NAV_BLUE
-    tplPaths(3) = dbPath & TPL_YIELD_RED
-    tplPaths(4) = dbPath & TPL_YIELD_BLUE
+    tplPaths(1) = dbPath & TPL_DIR & TPL_NAV_RED
+    tplPaths(2) = dbPath & TPL_DIR & TPL_NAV_BLUE
+    tplPaths(3) = dbPath & TPL_DIR & TPL_YIELD_RED
+    tplPaths(4) = dbPath & TPL_DIR & TPL_YIELD_BLUE
     
     Dim i As Long, missing As String
     For i = 1 To 4
