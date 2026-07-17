@@ -191,7 +191,6 @@ Private Sub CreateProductChart(ByVal ws As Worksheet)
     Dim ch As Chart
     Set ch = co.Chart
     ch.ChartType = xlLine
-    ch.DisplayBlanksAs = xlInterpolated
     ch.HasTitle = False
     ch.HasLegend = True
     ch.Legend.Position = xlLegendPositionTop
@@ -219,6 +218,8 @@ Private Sub CreateProductChart(ByVal ws As Worksheet)
     ApplyLastPointDataLabel sNav, navRng, "0.0000", COLOR_NAV
     ApplyLastPointDataLabel sProductReturn, productReturnRng, "0.00%", COLOR_PRODUCT_RETURN
     If Not sReitsReturn Is Nothing Then ApplyLastPointDataLabel sReitsReturn, ws.Range(COL_REITS_ANNUALIZED_RETURN & "2:" & COL_REITS_ANNUALIZED_RETURN & lastRow), "0.00%", COLOR_REITS_RETURN
+
+    ch.DisplayBlanksAs = xlInterpolated
 End Sub
 
 Private Function AddLineSeries(ByVal ch As Chart, ByVal xRange As Range, ByVal yRange As Range, ByVal seriesName As String, ByVal axisGroup As XlAxisGroup, ByVal colorHex As String) As Series
@@ -230,15 +231,21 @@ Private Function AddLineSeries(ByVal ch As Chart, ByVal xRange As Range, ByVal y
     s.ChartType = xlLine
     s.AxisGroup = axisGroup
 
-    With s.Format.Line
-        .Visible = msoTrue
-        .ForeColor.RGB = ColorFromHex(colorHex)
-        .Weight = 2.25
-    End With
-    s.MarkerStyle = xlMarkerStyleNone
+    ApplySeriesLineStyle s, ColorFromHex(colorHex)
 
     Set AddLineSeries = s
 End Function
+
+Private Sub ApplySeriesLineStyle(ByVal s As Series, ByVal lineColor As Long)
+    On Error Resume Next
+    With s.Border
+        .LineStyle = xlContinuous
+        .Color = lineColor
+        .Weight = xlMedium
+    End With
+    s.MarkerStyle = xlMarkerStyleNone
+    On Error GoTo 0
+End Sub
 
 Private Function ColorFromHex(ByVal colorHex As String) As Long
     Dim s As String
@@ -329,7 +336,7 @@ Private Sub FormatValueAxes(ByVal ch As Chart, ByVal navRng As Range, ByVal prod
     If StrComp(productCode, PRODUCT_OA4400, vbTextCompare) = 0 Then
         navAxisMax = AlignUp(navMax + (navMax - 1#), 0.01)
     Else
-        navAxisMax = AlignUp(navMax + (navMax - 1#) * 0.1, 0.01)
+        navAxisMax = AlignUp(navMax, 0.01)
     End If
     If navAxisMax <= 1# Then navAxisMax = 1.01
 
@@ -347,10 +354,11 @@ Private Sub FormatValueAxes(ByVal ch As Chart, ByVal navRng As Range, ByVal prod
     Dim retAxisMax As Double
     If StrComp(productCode, PRODUCT_OA4400, vbTextCompare) = 0 Then
         retAxisMin = AlignDown(retMin + retMin * 0.1, 0.01)
+        retAxisMax = AlignUp(retMax + retMax * 0.1, 0.01)
     Else
         retAxisMin = 0#
+        retAxisMax = AlignUp(retMax + retMax * 1#, 0.01)
     End If
-    retAxisMax = AlignUp(retMax + retMax * 0.1, 0.01)
     If retAxisMax <= retAxisMin Then retAxisMax = retAxisMin + 0.01
 
     On Error Resume Next
@@ -364,6 +372,8 @@ Private Sub FormatValueAxes(ByVal ch As Chart, ByVal navRng As Range, ByVal prod
     With ch.Axes(xlValue, xlSecondary)
         .MinimumScale = retAxisMin
         .MaximumScale = retAxisMax
+        .MajorTickMark = xlTickMarkNone
+        .MinorTickMark = xlTickMarkNone
         .TickLabels.NumberFormat = ";;;"
         .TickLabels.Font.Name = FONT_NAME
     End With

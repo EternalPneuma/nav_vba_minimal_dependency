@@ -51,72 +51,57 @@ VBA 源文件要求：
 
 ```txt
 .
-|- 上层产品净值数据库.xlsm
-|- README.md
-|- AGENTS.md
-|- .gitignore
-|- sync-vba.ps1
-|- assets
-|  |- chart_templates
-|  |  |- 净值图表_红.crtx
-|  |  |- 净值图表_蓝.crtx
-|  |  |- 收益率图表_红.crtx
-|  |  `- 收益率图表_蓝.crtx
-|  |- images
-|  |  |- background.png
-|  |  |- logo.png
-|  |  |- logo_white.png
-|  |  `- title.png
-|  `- 产品一页通-交鑫致远-模板.pptx
-`- scripts
-   |- py
-   |  `- fetch_reits_total_return.py
-   `- vba
-      |- chart
-      |  |- 01_auto_input.bas
-      |  |- 02_output_data.bas
-      |  |- 03_output_chart.bas
-      |  `- 04_output_image.bas
-      |- data
-      |  |- 01_auto_input.bas
-      |  |- 02_calculate_open_date.bas
-      |  |- 03_output_date.bas
-      |  `- 04_output_report.bas
-      |- optional_panel
-      |  |- 00_operation_panel.bas
-      |  |- 00_operation_panel_button.cls
-      |  `- 00_operation_panel_form.frm
-      |- product_one_page
-      |  |- 00_check_import_data.bas
-      |  |- 01_output_data.bas
-      |  |- 02_output_chart.bas
-      |  `- 03_output_ppt.bas
-      |- tool
-      |  |- t_01_clean_data.bas
-      |  |- t_02_del_data.bas
-      |  |- t_03_next_open_date_by_interval.bas
-      |  |- t_04_check_nav_data.bas
-      |  |- t_05_query_181_nav_stats.bas
-      |  `- t_06_delete_empty_rows.bas
-      `- weekly_recommendation
-         |- 01_update_weekly_recommendation_dependencies.bas
-         `- 02_generate_weekly_recommendation.bas
+├── 上层产品净值数据库.xlsm              # 主工作簿，VBA 宏运行入口
+├── README.md
+├── AGENTS.md
+├── .gitignore
+├── sync-vba.ps1                         # 将仓库源码导入主工作簿的同步脚本
+├── assets
+│   ├── chart_templates                  # Excel 图表模板（.crtx）
+│   │   ├── 净值图表_红.crtx
+│   │   ├── 净值图表_蓝.crtx
+│   │   ├── 收益率图表_红.crtx
+│   │   └── 收益率图表_蓝.crtx
+│   ├── images                           # 报表固定图片资源（背景图/logo/标题图）
+│   │   ├── background.png
+│   │   ├── logo.png
+│   │   ├── logo_white.png
+│   │   └── title.png
+│   └── 产品一页通-交鑫致远-模板.pptx    # 产品一页通 PPT 模板
+└── scripts
+    ├── py
+    │   └── fetch_reits_total_return.py  # 中证 REITs 全收益数据抓取
+    └── vba
+        ├── data                         # 数据导入 → 开放日计算 → 报表展示输出
+        │   ├── 01_auto_input.bas
+        │   ├── 02_calculate_open_date.bas
+        │   ├── 03_output_date.bas
+        │   └── 04_output_report.bas
+        ├── chart                        # 净值数据整理 → 图表生成 → 图表图片导出
+        │   ├── 01_auto_input.bas
+        │   ├── 02_output_data.bas
+        │   ├── 03_output_chart.bas
+        │   └── 04_output_image.bas
+        ├── weekly_recommendation        # 周度推荐材料：依赖更新 → 材料生成
+        │   ├── 01_update_weekly_recommendation_dependencies.bas
+        │   └── 02_generate_weekly_recommendation.bas
+        ├── product_one_page             # 产品一页通：数据 → 图表 → PPT 输出
+        │   ├── 00_check_import_data.bas
+        │   ├── 01_output_data.bas
+        │   ├── 02_output_chart.bas
+        │   └── 03_output_ppt.bas
+        ├── optional_panel               # VBA 操作面板（模块/类/窗体）
+        │   ├── 00_operation_panel.bas
+        │   ├── 00_operation_panel_button.cls
+        │   └── 00_operation_panel_form.frm
+        └── tool                         # 工具宏：清理/检查/查询
+            ├── t_01_clean_data.bas
+            ├── t_02_del_data.bas
+            ├── t_03_next_open_date_by_interval.bas
+            ├── t_04_check_nav_data.bas
+            ├── t_05_query_181_nav_stats.bas
+            └── t_06_delete_empty_rows.bas
 ```
-
-目录说明：
-
-- `上层产品净值数据库.xlsm`：主工作簿，VBA 宏运行入口。
-- `sync-vba.ps1`：将仓库源码导入主工作簿的同步脚本。
-- `assets\chart_templates`：Excel 图表模板，`scripts\vba\chart\03_output_chart.bas` 会从这里读取 `.crtx`。
-- `assets\images`：报表固定图片资源，包含背景图、logo 和标题图。
-- `assets\产品一页通-交鑫致远-模板.pptx`：产品一页通 PPT 模板。
-- `scripts\py`：Python 数据抓取脚本。
-- `scripts\vba\data`：数据导入、开放日计算、展示报表输出。
-- `scripts\vba\chart`：产品净值数据整理、图表生成、图表图片导出。
-- `scripts\vba\weekly_recommendation`：周度推荐材料依赖更新和材料生成。
-- `scripts\vba\product_one_page`：产品一页通数据、图表和 PPT 输出。
-- `scripts\vba\optional_panel`：VBA 操作面板相关模块、类和窗体。
-- `scripts\vba\tool`：清理、检查和查询类工具宏。
 
 ## 更新须知
 

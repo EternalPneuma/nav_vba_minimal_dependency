@@ -491,7 +491,7 @@ Private Function WriteDirectSection(ByVal wsSource As Worksheet, ByVal wsTarget 
                 wsTarget.Cells(nextRow, 6).Value = wsSource.Cells(sourceRow, DIRECT_COL_28DAY_ANNUAL).Value
             ElseIf sectionType = 2 Then
                 wsTarget.Cells(nextRow, 5).Value = wsSource.Cells(sourceRow, DIRECT_COL_BENCHMARK_RATE).Value
-                wsTarget.Cells(nextRow, 6).Value = PickDirectCycleAnnual(wsSource, sourceRow, intervalValue)
+                wsTarget.Cells(nextRow, 6).Value = wsSource.Cells(sourceRow, DIRECT_COL_28DAY_ANNUAL).Value
             Else
                 wsTarget.Cells(nextRow, 6).Value = wsSource.Cells(sourceRow, DIRECT_COL_INCEPTION_ANNUAL).Value
             End If
@@ -523,7 +523,7 @@ Private Sub WriteDirectSectionHeaders(ByVal ws As Worksheet, ByVal headerRow As 
         ws.Range("F" & headerRow).Value = "28日年化收益率"
     ElseIf sectionType = 2 Then
         ws.Range("E" & headerRow).Value = "基准"
-        ws.Range("F" & headerRow).Value = "7日/28日年化收益率"
+        ws.Range("F" & headerRow).Value = "28日年化收益率"
     Else
         With ws.Range("D" & headerRow & ":E" & headerRow)
             .Merge
@@ -648,19 +648,6 @@ Private Function IsDirectSeriesMatch(ByVal seriesValue As Variant, ByVal seriesK
         IsDirectSeriesMatch = (InStr(1, seriesText, "汇益", vbTextCompare) > 0 And InStr(1, seriesText, "稳健", vbTextCompare) = 0)
     Else
         IsDirectSeriesMatch = (InStr(1, seriesText, "交鑫致远", vbTextCompare) > 0)
-    End If
-End Function
-
-Private Function PickDirectCycleAnnual(ByVal wsSource As Worksheet, ByVal sourceRow As Long, ByVal intervalValue As Variant) As Variant
-    Dim intervalText As String
-    intervalText = NormalizeText(intervalValue)
-
-    If IsWeeklyInterval(intervalValue) Then
-        PickDirectCycleAnnual = wsSource.Cells(sourceRow, DIRECT_COL_7DAY_ANNUAL).Value
-    ElseIf intervalText = "28" Or InStr(1, intervalText, "四周", vbTextCompare) > 0 Then
-        PickDirectCycleAnnual = wsSource.Cells(sourceRow, DIRECT_COL_28DAY_ANNUAL).Value
-    Else
-        PickDirectCycleAnnual = vbNullString
     End If
 End Function
 
@@ -813,7 +800,7 @@ Private Function WriteBankSection(ByVal wsSource As Worksheet, ByVal wsTarget As
             ElseIf sectionType = 2 Then
                 wsTarget.Cells(nextRow, 4).Value = FormatOpenFrequency(intervalValue)
                 WriteValueOrSlash wsTarget.Cells(nextRow, 5), wsSource.Cells(sourceRow, BANK_COL_BENCHMARK_RATE).Value
-                wsTarget.Cells(nextRow, 6).Value = PickBankCycleAnnual(wsSource, sourceRow, intervalValue)
+                wsTarget.Cells(nextRow, 6).Value = wsSource.Cells(sourceRow, BANK_COL_28DAY_ANNUAL).Value
                 wsTarget.Range("E" & nextRow & ":F" & nextRow).NumberFormat = "0.00%"
             ElseIf sectionType = 3 Then
                 WriteValueOrSlash wsTarget.Cells(nextRow, 4), wsSource.Cells(sourceRow, BANK_COL_PREV_PERIOD_ANNUAL).Value
@@ -856,7 +843,7 @@ Private Sub WriteBankSectionHeaders(ByVal ws As Worksheet, ByVal headerRow As Lo
         ws.Range("C" & headerRow).Value = "下一开放日"
         ws.Range("D" & headerRow).Value = "开放频率"
         ws.Range("E" & headerRow).Value = "基准"
-        ws.Range("F" & headerRow).Value = "7日/28日年化收益率"
+        ws.Range("F" & headerRow).Value = "28日年化收益率"
     ElseIf sectionType = 3 Then
         ws.Range("B" & headerRow).Value = "长期限产品名称"
         ws.Range("C" & headerRow).Value = "下一开放日"
@@ -976,19 +963,6 @@ Private Function IsBankSeriesMatch(ByVal seriesValue As Variant, ByVal sectionTy
         IsBankSeriesMatch = (InStr(1, seriesText, "稳享", vbTextCompare) > 0)
     Else
         IsBankSeriesMatch = (InStr(1, seriesText, "蓝色港湾", vbTextCompare) > 0)
-    End If
-End Function
-
-Private Function PickBankCycleAnnual(ByVal wsSource As Worksheet, ByVal sourceRow As Long, ByVal intervalValue As Variant) As Variant
-    Dim intervalText As String
-    intervalText = NormalizeText(intervalValue)
-
-    If IsWeeklyInterval(intervalValue) Then
-        PickBankCycleAnnual = wsSource.Cells(sourceRow, BANK_COL_7DAY_ANNUAL).Value
-    ElseIf intervalText = "28" Or InStr(1, intervalText, "四周", vbTextCompare) > 0 Then
-        PickBankCycleAnnual = wsSource.Cells(sourceRow, BANK_COL_28DAY_ANNUAL).Value
-    Else
-        PickBankCycleAnnual = vbNullString
     End If
 End Function
 
