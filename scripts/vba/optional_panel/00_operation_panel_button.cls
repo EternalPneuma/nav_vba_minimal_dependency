@@ -1,7 +1,7 @@
 Option Explicit
 
 ' 类模块名称：clsOperationPanelButton
-' 用途：承接操作面板动态按钮的 Click 事件。
+' 用途：承接操作面板动态按钮的 Click 与键盘事件。
 
 Private WithEvents mButton As MSForms.CommandButton
 Private mOwnerForm As Object
@@ -22,3 +22,6 @@ Private Sub mButton_Click()
     mOwnerForm.RunPanelAction mActionTitle, mMacroNames
 End Sub
 
+Private Sub mButton_KeyDown(ByVal KeyCode As MSForms.ReturnInteger, ByVal Shift As Integer)
+    If mOwnerForm.HandlePanelKey(mButton, CLng(KeyCode)) Then KeyCode = 0
+End Sub

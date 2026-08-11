@@ -20,7 +20,7 @@ Public Sub Chart01_ImportNavData()
     Dim t0 As Double: t0 = Timer
 
     Dim confirmResult As VbMsgBoxResult
-    confirmResult = MsgBox("运行前请确认：" & vbCrLf & vbCrLf & _
+    confirmResult = ReportPipeline_MsgBox("运行前请确认：" & vbCrLf & vbCrLf & _
                            "1. 已经下载或导出“净值表”的数据。" & vbCrLf & _
                            "2. 净值表文件已保存到当前数据库工作簿同级目录。" & vbCrLf & _
                            "3. 文件名保持系统默认格式：" & SOURCE_FILE_DESC & vbCrLf & vbCrLf & _
@@ -29,7 +29,7 @@ Public Sub Chart01_ImportNavData()
     If confirmResult <> vbYes Then Exit Sub
     
     If Len(ThisWorkbook.Path) = 0 Then
-        MsgBox "绘图净值数据导入无法继续" & vbCrLf & vbCrLf & _
+        ReportPipeline_MsgBox "绘图净值数据导入无法继续" & vbCrLf & vbCrLf & _
                "错误信息：当前数据库工作簿尚未保存，请先保存后再运行导入。", vbExclamation, "绘图净值数据导入"
         Exit Sub
     End If
@@ -131,7 +131,7 @@ Public Sub Chart01_ImportNavData()
         On Error Resume Next
         Set wbSrc = Workbooks.Open(fileName:=filePath, ReadOnly:=True, UpdateLinks:=0)
         If wbSrc Is Nothing Then
-            MsgBox "绘图净值数据导入警告" & vbCrLf & vbCrLf & _
+            ReportPipeline_MsgBox "绘图净值数据导入警告" & vbCrLf & vbCrLf & _
                    "错误信息：无法打开文件，可能被占用，已跳过。" & vbCrLf & _
                    "文件：" & filePath, vbExclamation, "绘图净值数据导入"
             On Error GoTo 0
@@ -217,7 +217,7 @@ NextFile:
             header:=xlNo
     End If
     
-    MsgBox "绘图净值数据导入完成" & vbCrLf & vbCrLf & _
+    ReportPipeline_MsgBox "绘图净值数据导入完成" & vbCrLf & vbCrLf & _
            "处理范围：" & folderPath & vbCrLf & _
            "耗时：" & Format(Timer - t0, "0.00") & " 秒" & vbCrLf & vbCrLf & _
            "处理结果：" & vbCrLf & _
@@ -243,7 +243,7 @@ Private Sub ImportFromInternalNav181(ByVal wsDB As Worksheet, ByVal t0 As Double
     On Error GoTo 0
 
     If wsSource Is Nothing Then
-        MsgBox "绘图净值数据导入无法继续" & vbCrLf & vbCrLf & _
+        ReportPipeline_MsgBox "绘图净值数据导入无法继续" & vbCrLf & vbCrLf & _
                "错误信息：未找到任何[" & SOURCE_FILE_DESC & "]文件，也未找到内部sheet：" & INTERNAL_SOURCE_SHEET_NAME & vbCrLf & _
                "处理范围：" & folderPath, vbExclamation, "绘图净值数据导入"
         Exit Sub
@@ -297,9 +297,17 @@ Private Sub ImportFromInternalNav181(ByVal wsDB As Worksheet, ByVal t0 As Double
         Next r
     End If
 
+    ' 报表图表配置是图表产品需求的权威来源；允许尚未出现在绘图净值数据中的新产品首次导入。
+    Dim configuredChartCodes As Object
+    Set configuredChartCodes = ReportConfig_GetRequiredChartCodeSet()
+    Dim configuredCode As Variant
+    For Each configuredCode In configuredChartCodes.Keys
+        targetProductSet(CStr(configuredCode)) = True
+    Next configuredCode
+
     If targetProductSet.Count = 0 Then
-        MsgBox "绘图净值数据导入无法继续" & vbCrLf & vbCrLf & _
-               "错误信息：未找到外部净值表，且“" & TARGET_SHEET_NAME & "”中没有已有产品编号，无法从内部sheet补充缺失日期。", _
+        ReportPipeline_MsgBox "绘图净值数据导入无法继续" & vbCrLf & vbCrLf & _
+               "错误信息：绘图净值数据和报表图表配置中都没有目标产品。", _
                vbExclamation, "绘图净值数据导入"
         Exit Sub
     End If
@@ -419,7 +427,7 @@ ContinueSourceRow:
             header:=xlNo
     End If
 
-    MsgBox "绘图净值数据导入完成" & vbCrLf & vbCrLf & _
+    ReportPipeline_MsgBox "绘图净值数据导入完成" & vbCrLf & vbCrLf & _
            "处理范围：" & folderPath & vbCrLf & _
            "内部sheet：" & INTERNAL_SOURCE_SHEET_NAME & vbCrLf & _
            "耗时：" & Format(Timer - t0, "0.00") & " 秒" & vbCrLf & vbCrLf & _
@@ -437,7 +445,7 @@ ContinueSourceRow:
     Exit Sub
 
 InternalFail:
-    MsgBox "绘图净值数据导入失败" & vbCrLf & vbCrLf & _
+    ReportPipeline_MsgBox "绘图净值数据导入失败" & vbCrLf & vbCrLf & _
            "错误信息：未找到外部净值表，改从内部sheet导入时失败：" & Err.Description & vbCrLf & _
            "内部sheet：" & INTERNAL_SOURCE_SHEET_NAME, vbCritical, "绘图净值数据导入"
 End Sub

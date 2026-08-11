@@ -5,13 +5,13 @@ Option Explicit
 '
 ' 计算逻辑：
 '   基准日期 = sheet"上层产品净值数据(181)"B列日期（yyyyMMdd格式）的最大值
-'   下一开放日 = 开放日列表中 >= 基准日期的最小日期
+'   下一开放日 = 开放日列表中 > 基准日期的最小日期
 '   上一开放日 = 开放日列表中 <  基准日期的最大日期
 '   上上一开放日 = 开放日列表中 < 上一开放日的最大日期（无则留空）
 '   实际间隔 = 下一开放日 - 上一开放日（天数）
 '   上次开放实际间隔 = 上一开放日 - 上上一开放日（天数，无则留空）
 '   运作时间 = 基准日期 - 上一开放日（天数）
-'   日开/周开产品（理论间隔=1/7）直接跳过，不填写开放日测算列。
+'   日开产品（理论间隔=1）不填写开放日测算列；周开产品由统一开放日补算流程处理。
 '   非日开/周开但开放日工作表中无数据的产品，在完成提示中单独列出。
 '   基准日期净值 = sheet"上层产品净值数据(181)"中匹配信托计划代码且日期=基准日期的单位净值。
 
@@ -66,11 +66,22 @@ Private Sub CalculateOpenDaysCore()
     Dim baselineDate As Date
     baselineDate = GetBaselineDateFromNAV()
 
-    ' 2. 构建净值数据查找表：信托计划代码 → 基准日期的单位净值
+    ' 2. 先处理已确认的开放日提议；存在待确认项时正常中止，避免使用未确认日期计算。
+    Dim openDateMessage As String
+    If Not OpenDate_EnsureReady(baselineDate, openDateMessage) Then
+        Application.Calculation = appCalc
+        Application.EnableEvents = oldEnableEvents
+        Application.ScreenUpdating = oldScreenUpdating
+        ThisWorkbook.Worksheets("开放日待确认").Activate
+        ReportPipeline_MsgBox openDateMessage, vbExclamation, "开放日待确认"
+        Exit Sub
+    End If
+
+    ' 3. 构建净值数据查找表：信托计划代码 → 基准日期的单位净值
     Dim navLookup As Object
     Set navLookup = BuildNAVDateLookup()
 
-    ' 3. 构建开放日索引：序号 → 有序日期集合
+    ' 4. 构建开放日索引：序号 → 有序日期集合
     Dim openDayIndex As Object
     Set openDayIndex = BuildOpenDayIndex()
 
@@ -154,8 +165,8 @@ Private Sub CalculateOpenDaysCore()
             navMatchedCount = navMatchedCount + 1
         End If
 
-        ' 先按理论间隔识别日开/周开产品，跳过开放日测算。
-        If IsDailyOrWeeklyInterval(wsTarget.Cells(r, theoreticalIntervalCol).Value) Then
+        ' 日开产品没有离散的下一开放日，跳过开放日测算；周开产品使用已确认台账。
+        If IsDailyInterval(wsTarget.Cells(r, theoreticalIntervalCol).Value) Then
             skippedCount = skippedCount + 1
             processedCount = processedCount + 1
             GoTo ContinueRow
@@ -242,7 +253,7 @@ ContinueRow:
           "基准日期：" & Format$(baselineDate, "yyyy-mm-dd") & vbCrLf & vbCrLf & _
           "处理结果：" & vbCrLf & _
           "计算产品数：" & processedCount & vbCrLf & _
-          "跳过（日开/周开）：" & skippedCount & vbCrLf & _
+          "跳过（日开）：" & skippedCount & vbCrLf & _
           "未被跳过但开放日未检测到：" & missingOpenDayCount & vbCrLf & _
           "净值匹配数：" & navMatchedCount
 
@@ -252,26 +263,24 @@ ContinueRow:
               "未检测到开放日的产品：" & vbCrLf & TruncateMessageText(missingOpenDayDetails, 900)
     End If
 
-    MsgBox msg, vbInformation, "开放日测算"
+    ReportPipeline_MsgBox msg, vbInformation, "开放日测算"
     Exit Sub
 
 CleanFail:
     Application.Calculation = appCalc
     Application.EnableEvents = oldEnableEvents
     Application.ScreenUpdating = oldScreenUpdating
-    MsgBox "开放日测算失败" & vbCrLf & vbCrLf & _
+    ReportPipeline_MsgBox "开放日测算失败" & vbCrLf & vbCrLf & _
            "错误信息：" & err.Description, vbCritical, "开放日测算"
 End Sub
 
-Private Function IsDailyOrWeeklyInterval(ByVal intervalValue As Variant) As Boolean
+Private Function IsDailyInterval(ByVal intervalValue As Variant) As Boolean
     Dim intervalText As String
     intervalText = NormalizeText(intervalValue)
     If Len(intervalText) = 0 Then Exit Function
     If Not IsNumeric(intervalText) Then Exit Function
 
-    Dim intervalDays As Long
-    intervalDays = CLng(intervalText)
-    IsDailyOrWeeklyInterval = (intervalDays = 1 Or intervalDays = 7)
+    IsDailyInterval = (CLng(intervalText) = 1)
 End Function
 
 Private Function TruncateMessageText(ByVal textValue As String, ByVal maxLength As Long) As String
@@ -346,7 +355,7 @@ Private Sub FindOpenDates(ByVal openDates As Collection, ByVal baselineDate As D
             ElseIf IsEmpty(prevPrevDate) Or dt > CDate(prevPrevDate) Then
                 prevPrevDate = dt
             End If
-        Else
+        ElseIf dt > baselineDate Then
             If IsEmpty(nextDate) Then
                 nextDate = dt
             ElseIf dt < CDate(nextDate) Then

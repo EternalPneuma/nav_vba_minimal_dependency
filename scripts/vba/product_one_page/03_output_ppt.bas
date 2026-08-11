@@ -139,7 +139,7 @@ Public Sub OnePage03_ExportPptPdf()
     Application.EnableEvents = oldEnableEvents
     Application.ScreenUpdating = oldScreenUpdating
 
-    MsgBox "产品一页通PPT/PDF导出完成" & vbCrLf & vbCrLf & _
+    ReportPipeline_MsgBox "产品一页通PPT/PDF导出完成" & vbCrLf & vbCrLf & _
            "处理结果：" & vbCrLf & _
            "图表工作簿：" & chartWorkbookFile & vbCrLf & vbCrLf & _
            "输出文件：" & vbCrLf & _
@@ -172,7 +172,7 @@ CleanFail:
     If Len(failDescription) = 0 Then failDescription = "未知错误"
     If Len(failStep) = 0 Then failStep = "未记录"
 
-    MsgBox "产品一页通PPT/PDF导出失败" & vbCrLf & vbCrLf & _
+    ReportPipeline_MsgBox "产品一页通PPT/PDF导出失败" & vbCrLf & vbCrLf & _
            "错误信息：" & failDescription & vbCrLf & _
            "错误号：" & failNumber & vbCrLf & _
            "步骤：" & failStep, vbCritical, "产品一页通"

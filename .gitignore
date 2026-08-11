@@ -1,5 +1,10 @@
 # Excel
 *.xlsx
+~$*
+*备份.xlsm
+
+# images
+*.png
 
 # Python
 *.pyc

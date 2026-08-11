@@ -1,87 +1,63 @@
-' Data04_ExportDisplayReport：将 yyyyMMdd-上层产品分类表现.xlsx 整理为 yyyyMMdd-展示.xlsx 展示报表模块
+' Data04_ExportDisplayReport：按报表配置生成 yyyyMMdd-产品收益展示.xlsx
 
 Option Explicit
 
 Private Const SOURCE_FILE_SUFFIX As String = "-上层产品分类表现.xlsx"
 Private Const OUTPUT_FILE_SUFFIX As String = "-产品收益展示.xlsx"
-Private Const TITLE_IMAGE_NAME As String = "title.png"
+Private Const SHEET_PRODUCT_CATEGORY As String = "产品分类"
+Private Const SHEET_PRODUCT_INFO As String = "产品信息"
 Private Const ASSET_IMAGE_FOLDER As String = "assets\images"
-
-Private Const PRODUCT_CATEGORY_SHEET_NAME As String = "产品分类"
-Private Const CAT_STABLE As String = "稳享长期限"
-Private Const CAT_DIRECT As String = "直销"
-Private Const CAT_BANK As String = "交行代销"
-Private Const CAT_YUANRONG_ANXIANG As String = "圆融安享"
+Private Const TITLE_IMAGE_NAME As String = "title.png"
 
 Private Const COL_BASELINE_DATE As String = "基准日期"
+Private Const COL_SEQ As String = "序号"
+Private Const COL_TRUST_CODE As String = "信托计划代码"
+Private Const COL_SERIES As String = "系列"
+Private Const COL_CATEGORY As String = "分类"
+Private Const COL_PRODUCT_NAME As String = "产品名称"
+Private Const COL_NEXT_OPEN As String = "下一开放日"
+Private Const COL_THEORETICAL_INTERVAL As String = "理论间隔"
+Private Const COL_ELAPSED As String = "运作时间"
+Private Const COL_BENCHMARK_RATE As String = "基准收益率"
+Private Const COL_PREV_PERIOD_ANNUAL As String = "上一周期年化"
+Private Const COL_CURRENT_PERIOD_ANNUAL As String = "当前周期年化"
+Private Const COL_7DAY_ANNUAL As String = "7日年化"
+Private Const COL_28DAY_ANNUAL As String = "28日年化"
+Private Const COL_INCEPTION_ANNUAL As String = "成立以来年化"
+Private Const COL_PRODUCT_SHORT As String = "产品简称"
 
-Private Const STABLE_COL_SEQ As Long = 1
-Private Const DIRECT_COL_SEQ As Long = 1
-Private Const DIRECT_COL_SERIES As Long = 3
-Private Const DIRECT_COL_PRODUCT_NAME As Long = 4
-Private Const DIRECT_COL_NEXT_OPEN As Long = 9
-Private Const DIRECT_COL_THEORETICAL_INTERVAL As Long = 10
-Private Const DIRECT_COL_BENCHMARK_RATE As Long = 12
-Private Const DIRECT_COL_7DAY_ANNUAL As Long = 13
-Private Const DIRECT_COL_28DAY_ANNUAL As Long = 14
-Private Const DIRECT_COL_INCEPTION_ANNUAL As Long = 15
-
-Private Const BANK_COL_SEQ As Long = 1
-Private Const BANK_COL_SERIES As Long = 3
-Private Const BANK_COL_PRODUCT_NAME As Long = 4
-Private Const BANK_COL_NEXT_OPEN As Long = 9
-Private Const BANK_COL_THEORETICAL_INTERVAL As Long = 10
-Private Const BANK_COL_BENCHMARK_RATE As Long = 12
-Private Const BANK_COL_ELAPSED As Long = 15
-Private Const BANK_COL_PREV_PERIOD_ANNUAL As Long = 16
-Private Const BANK_COL_CURRENT_PERIOD_ANNUAL As Long = 17
-Private Const BANK_COL_7DAY_ANNUAL As Long = 18
-Private Const BANK_COL_28DAY_ANNUAL As Long = 19
-
-Private Const STABLE_COL_PRODUCT_NAME As Long = 4
-Private Const STABLE_COL_NEXT_OPEN As Long = 9
-Private Const STABLE_COL_THEORETICAL_INTERVAL As Long = 10
-Private Const STABLE_COL_ELAPSED As Long = 12
-Private Const STABLE_COL_CURRENT_ANNUAL As Long = 13
-
-Private Const YRA_COL_SEQ As Long = 1
-Private Const YRA_COL_SERIES As Long = 3
-Private Const YRA_COL_PRODUCT_NAME As Long = 4
-Private Const YRA_COL_NEXT_OPEN As Long = 7
-Private Const YRA_COL_THEORETICAL_INTERVAL As Long = 8
-Private Const YRA_COL_7DAY_ANNUAL As Long = 10
-Private Const YRA_COL_28DAY_ANNUAL As Long = 11
-
-Private Const FONT_NAME As String = "微软雅黑"
-Private Const FONT_NAME_YUANRONG As String = "宋体"
+Private Const FONT_RED As String = "微软雅黑"
+Private Const FONT_BLUE As String = "宋体"
 Private Const COLOR_DARK_RED As Long = &H19198B
 Private Const COLOR_DARK_RED_ALT As Long = &HA1370
 Private Const COLOR_GOLD As Long = &H8BDCF4
 Private Const COLOR_WHITE As Long = &HFFFFFF
-Private Const COLOR_YUANRONG_TITLE As Long = &H7C3702
-Private Const COLOR_YUANRONG_RECORD As Long = &HF8F0EC
+Private Const COLOR_BLUE_TITLE As Long = &H7C3702
+Private Const COLOR_BLUE_RECORD As Long = &HF8F0EC
 Private Const COLOR_BLACK As Long = &H0
+Private Const DECORATION_COLUMN_WIDTH As Double = 3
+Private Const REPORT_START_COLUMN As Long = 2   ' B列；A/G为装饰列
+Private Const REPORT_CONTENT_COLUMN_COUNT As Long = 5   ' B:F
 
 Public Sub Data04_ExportDisplayReport()
-    OutputDisplayReportCore
+    ExportConfiguredDisplayReport
 End Sub
 
-Private Sub OutputDisplayReportCore()
-    Dim appCalc As XlCalculation
+Private Sub ExportConfiguredDisplayReport()
     Dim oldScreenUpdating As Boolean
     Dim oldEnableEvents As Boolean
     Dim oldDisplayAlerts As Boolean
     Dim oldAskToUpdateLinks As Boolean
-
+    Dim oldCalculation As XlCalculation
     oldScreenUpdating = Application.ScreenUpdating
     oldEnableEvents = Application.EnableEvents
     oldDisplayAlerts = Application.DisplayAlerts
     oldAskToUpdateLinks = Application.AskToUpdateLinks
-    appCalc = Application.Calculation
+    oldCalculation = Application.Calculation
 
     Dim wbSource As Workbook
     Dim wbOutput As Workbook
-
+    Dim currentStage As String
     On Error GoTo CleanFail
     Application.ScreenUpdating = False
     Application.EnableEvents = False
@@ -89,283 +65,880 @@ Private Sub OutputDisplayReportCore()
     Application.AskToUpdateLinks = False
     Application.Calculation = xlCalculationManual
 
+    currentStage = "校验报表配置"
+    Dim configErrors As String
+    If Not ReportConfig_Validate(configErrors) Then
+        Err.Raise vbObjectError + 4101, , "报表配置静态预检未通过：" & vbCrLf & configErrors
+    End If
+
     Dim baselineDate As Date
     baselineDate = GetBaselineDateFromProductCategory()
 
     Dim sourcePath As String
-    sourcePath = ThisWorkbook.Path & Application.PathSeparator & Format$(baselineDate, "yyyymmdd") & SOURCE_FILE_SUFFIX
-    If Dir(sourcePath) = vbNullString Then
-        Err.Raise vbObjectError + 4101, , "未找到上一步输出文件：" & sourcePath
-    End If
+    sourcePath = ThisWorkbook.Path & Application.PathSeparator & _
+                 Format$(baselineDate, "yyyymmdd") & SOURCE_FILE_SUFFIX
+    If Len(Dir(sourcePath)) = 0 Then Err.Raise vbObjectError + 4102, , "未找到分类表现文件：" & sourcePath
 
+    currentStage = "打开分类表现文件"
     Set wbSource = Workbooks.Open(FileName:=sourcePath, ReadOnly:=True, UpdateLinks:=False)
-    Set wbOutput = CreateDisplayWorkbook()
 
-    WriteStableLongTermReport wbSource.Worksheets(CAT_STABLE), wbOutput.Worksheets(CAT_STABLE), baselineDate
-    WriteDirectSalesReport wbSource.Worksheets(CAT_DIRECT), wbOutput.Worksheets(CAT_DIRECT), baselineDate
-    WriteBankAgentReport wbSource.Worksheets(CAT_BANK), wbOutput.Worksheets(CAT_BANK), baselineDate
-    WriteYuanRongAnXiangReport wbSource.Worksheets(CAT_YUANRONG_ANXIANG), wbOutput.Worksheets(CAT_YUANRONG_ANXIANG), baselineDate
+    currentStage = "读取报表配置"
+    Dim categoryDefinitions As Collection
+    Dim groupDefinitions As Collection
+    Dim schemeDefinitions As Collection
+    Dim chartDefinitions As Collection
+    Set categoryDefinitions = ReportConfig_GetCategoryDefinitions()
+    Set groupDefinitions = ReportConfig_GetGroupDefinitions()
+    Set schemeDefinitions = ReportConfig_GetSchemeDefinitions()
+    Set chartDefinitions = ReportConfig_GetChartDefinitions()
 
-    AddTitleImageIfExists wbOutput.Worksheets(CAT_DIRECT)
-    AddTitleImageIfExists wbOutput.Worksheets(CAT_BANK)
-    AddTitleImageIfExists wbOutput.Worksheets(CAT_STABLE)
+    Dim enabledCategories As Collection
+    Set enabledCategories = GetSortedEnabledCategories(categoryDefinitions)
+    currentStage = "创建展示工作簿"
+    Set wbOutput = CreateDisplayWorkbook(enabledCategories)
 
-    Dim imageNotice As String
-    imageNotice = InsertChartImagesIntoDisplay(wbOutput, ThisWorkbook.Path & Application.PathSeparator, Format$(baselineDate, "yyyymmdd"))
+    currentStage = "建立配置索引"
+    Dim schemesByName As Object
+    Set schemesByName = IndexRowsByKey(schemeDefinitions, "方案名称")
+    Dim productShortNames As Object
+    Set productShortNames = BuildProductShortNameMap()
+
+    Dim missingRequiredImages As String
+    Dim categoryDefinition As Variant
+    For Each categoryDefinition In enabledCategories
+        Dim categoryName As String
+        Dim sheetName As String
+        Dim themeName As String
+        categoryName = RowText(categoryDefinition, "分类")
+        sheetName = RowText(categoryDefinition, "工作表名称")
+        themeName = RowText(categoryDefinition, "视觉主题")
+
+        Dim wsSource As Worksheet
+        Dim wsTarget As Worksheet
+        Set wsSource = wbSource.Worksheets(sheetName)
+        Set wsTarget = wbOutput.Worksheets(sheetName)
+
+        currentStage = "初始化分类：" & categoryName
+        Dim nextRow As Long
+        nextRow = InitializeCategoryPage(wsTarget, categoryDefinition)
+        currentStage = "插入分类图表：" & categoryName
+        nextRow = InsertConfiguredCharts(wsTarget, categoryName, themeName, nextRow, _
+                                         chartDefinitions, productShortNames, baselineDate, missingRequiredImages)
+        currentStage = "写入分类分组：" & categoryName
+        nextRow = WriteConfiguredGroups(wsSource, wsTarget, categoryName, themeName, nextRow, _
+                                        groupDefinitions, schemesByName)
+        currentStage = "完成分类页：" & categoryName
+        FinishCategoryPage wsTarget, themeName, nextRow, baselineDate
+    Next categoryDefinition
+
+    If Len(missingRequiredImages) > 0 Then
+        Err.Raise vbObjectError + 4103, , "以下必需图表缺失或日期不一致：" & vbCrLf & missingRequiredImages
+    End If
 
     Dim outputPath As String
-    outputPath = ThisWorkbook.Path & Application.PathSeparator & Format$(baselineDate, "yyyymmdd") & OUTPUT_FILE_SUFFIX
+    Dim tempPath As String
+    outputPath = ThisWorkbook.Path & Application.PathSeparator & _
+                 Format$(baselineDate, "yyyymmdd") & OUTPUT_FILE_SUFFIX
+    tempPath = ThisWorkbook.Path & Application.PathSeparator & _
+               Format$(baselineDate, "yyyymmdd") & "-产品收益展示.tmp.xlsx"
 
-    wbOutput.SaveAs FileName:=outputPath, FileFormat:=xlOpenXMLWorkbook
+    currentStage = "保存展示报表"
+    If Len(Dir(tempPath)) > 0 Then Kill tempPath
+    wbOutput.SaveAs FileName:=tempPath, FileFormat:=xlOpenXMLWorkbook
     wbOutput.Close SaveChanges:=False
+    Set wbOutput = Nothing
     wbSource.Close SaveChanges:=False
+    Set wbSource = Nothing
+    ReplaceFileSafely tempPath, outputPath
 
-    Application.Calculation = appCalc
-    Application.AskToUpdateLinks = oldAskToUpdateLinks
-    Application.DisplayAlerts = oldDisplayAlerts
-    Application.EnableEvents = oldEnableEvents
-    Application.ScreenUpdating = oldScreenUpdating
+    RestoreApplicationState oldScreenUpdating, oldEnableEvents, oldDisplayAlerts, _
+                            oldAskToUpdateLinks, oldCalculation
+    RecordLastRunMessage "Data04 成功：" & outputPath
 
-    Dim finalMsg As String
-    finalMsg = "展示报表生成完成" & vbCrLf & vbCrLf & _
-               "基准日期：" & Format$(baselineDate, "yyyy-mm-dd") & vbCrLf & vbCrLf & _
-               "输出文件：" & vbCrLf & outputPath
-    If Len(imageNotice) > 0 Then
-        finalMsg = finalMsg & vbCrLf & vbCrLf & "注意事项：" & vbCrLf & imageNotice
-    End If
-    MsgBox finalMsg, vbInformation, "展示报表"
+    ReportPipeline_MsgBox "展示报表生成完成" & vbCrLf & vbCrLf & _
+           "基准日期：" & Format$(baselineDate, "yyyy-mm-dd") & vbCrLf & _
+           "输出分类：" & enabledCategories.Count & vbCrLf & vbCrLf & _
+           "输出文件：" & vbCrLf & outputPath, vbInformation, "展示报表"
     Exit Sub
 
 CleanFail:
+    Dim errorDescription As String
+    errorDescription = currentStage & "失败：" & Err.Description
     On Error Resume Next
     If Not wbOutput Is Nothing Then wbOutput.Close SaveChanges:=False
     If Not wbSource Is Nothing Then wbSource.Close SaveChanges:=False
     On Error GoTo 0
-
-    Application.Calculation = appCalc
-    Application.AskToUpdateLinks = oldAskToUpdateLinks
-    Application.DisplayAlerts = oldDisplayAlerts
-    Application.EnableEvents = oldEnableEvents
-    Application.ScreenUpdating = oldScreenUpdating
-
-    MsgBox "展示报表生成失败" & vbCrLf & vbCrLf & _
-           "错误信息：" & Err.Description, vbCritical, "展示报表"
+    RestoreApplicationState oldScreenUpdating, oldEnableEvents, oldDisplayAlerts, _
+                            oldAskToUpdateLinks, oldCalculation
+    RecordLastRunMessage "Data04 失败：" & errorDescription
+    ReportPipeline_MsgBox "展示报表生成失败" & vbCrLf & vbCrLf & _
+           "错误信息：" & errorDescription, vbCritical, "展示报表"
 End Sub
 
-Private Function CreateDisplayWorkbook() As Workbook
+Private Function CreateDisplayWorkbook(ByVal categoryDefinitions As Collection) As Workbook
+    Dim currentSheetName As String
+    On Error GoTo CreateFail
     Dim wb As Workbook
-    Dim ws As Worksheet
-
     Set wb = Workbooks.Add
 
-    Application.DisplayAlerts = False
     Do While wb.Worksheets.Count > 1
         wb.Worksheets(wb.Worksheets.Count).Delete
     Loop
-    Application.DisplayAlerts = True
 
-    Set ws = wb.Worksheets(1)
-    ws.Name = CAT_STABLE
-    ws.Cells.Font.Name = FONT_NAME
-
-    Set ws = wb.Worksheets.Add(After:=wb.Worksheets(wb.Worksheets.Count))
-    ws.Name = CAT_DIRECT
-    ws.Cells.Font.Name = FONT_NAME
-
-    Set ws = wb.Worksheets.Add(After:=wb.Worksheets(wb.Worksheets.Count))
-    ws.Name = CAT_BANK
-    ws.Cells.Font.Name = FONT_NAME
-
-    Set ws = wb.Worksheets.Add(After:=wb.Worksheets(wb.Worksheets.Count))
-    ws.Name = CAT_YUANRONG_ANXIANG
-    ws.Cells.Font.Name = FONT_NAME_YUANRONG
+    Dim isFirst As Boolean
+    isFirst = True
+    Dim definition As Variant
+    For Each definition In categoryDefinitions
+        Dim ws As Worksheet
+        If isFirst Then
+            Set ws = wb.Worksheets(1)
+            isFirst = False
+        Else
+            Set ws = wb.Worksheets.Add(After:=wb.Worksheets(wb.Worksheets.Count))
+        End If
+        currentSheetName = RowText(definition, "工作表名称")
+        ws.Name = currentSheetName
+    Next definition
 
     Set CreateDisplayWorkbook = wb
+    Exit Function
+
+CreateFail:
+    Dim errorDescription As String
+    Dim workbookName As String
+    Dim existingSheetName As String
+    errorDescription = Err.Description
+    On Error Resume Next
+    workbookName = wb.Name
+    existingSheetName = ws.Name
+    If Not wb Is Nothing Then wb.Close SaveChanges:=False
+    On Error GoTo 0
+    Err.Raise vbObjectError + 4104, , "创建工作表“" & currentSheetName & "”失败；工作簿=" & _
+              workbookName & "；当前工作表=" & existingSheetName & "：" & errorDescription
 End Function
 
-Private Sub WriteStableLongTermReport(ByVal wsSource As Worksheet, ByVal wsTarget As Worksheet, ByVal baselineDate As Date)
-    Dim lastSourceRow As Long
-    Dim sourceRow As Long
-    Dim targetRow As Long
+Private Function InitializeCategoryPage(ByVal ws As Worksheet, ByVal categoryDefinition As Object) As Long
+    Dim themeName As String
+    themeName = RowText(categoryDefinition, "视觉主题")
+    ws.Cells.Clear
 
-    wsTarget.Cells.ClearFormats
-    wsTarget.Cells.Font.Name = FONT_NAME
+    ApplyBaseThemeLayout ws, themeName
 
-    With wsTarget.Range("B3:F3")
-        .Merge
-        .Value = "热销产品"
-        .HorizontalAlignment = xlCenter
-        .VerticalAlignment = xlCenter
-        .Font.Bold = True
-        .Font.Size = 24
-        .Font.Color = COLOR_GOLD
-    End With
-
-    With wsTarget.Range("B6:F6")
-        .Merge
-        .Value = "汇益稳享系列兑付业绩"
-        .HorizontalAlignment = xlCenter
-        .VerticalAlignment = xlCenter
-        .Font.Bold = True
-        .Font.Size = 24
-        .Font.Color = COLOR_GOLD
-    End With
-
-    wsTarget.Range("B7").Value = "产品名称"
-    wsTarget.Range("C7").Value = "下一开放日"
-    wsTarget.Range("D7").Value = "开放频率"
-    wsTarget.Range("E7").Value = "当前周期运作天数"
-    wsTarget.Range("F7").Value = "当前周期年化"
-
-    lastSourceRow = LastUsedRow(wsSource)
-    targetRow = 8
-
-    For sourceRow = 2 To lastSourceRow
-        If Len(NormalizeText(wsSource.Cells(sourceRow, STABLE_COL_PRODUCT_NAME).Value)) > 0 Then
-            wsTarget.Cells(targetRow, 1).Value = BuildSortKey(wsSource.Cells(sourceRow, STABLE_COL_SEQ).Value)
-            wsTarget.Cells(targetRow, 2).Value = wsSource.Cells(sourceRow, STABLE_COL_PRODUCT_NAME).Value
-            wsTarget.Cells(targetRow, 3).Value = wsSource.Cells(sourceRow, STABLE_COL_NEXT_OPEN).Value
-            wsTarget.Cells(targetRow, 4).Value = FormatOpenFrequency(wsSource.Cells(sourceRow, STABLE_COL_THEORETICAL_INTERVAL).Value)
-            wsTarget.Cells(targetRow, 5).Value = wsSource.Cells(sourceRow, STABLE_COL_ELAPSED).Value
-            wsTarget.Cells(targetRow, 6).Value = wsSource.Cells(sourceRow, STABLE_COL_CURRENT_ANNUAL).Value
-            wsTarget.Cells(targetRow, 7).Value = BuildSortKey(wsSource.Cells(sourceRow, STABLE_COL_THEORETICAL_INTERVAL).Value)
-
-            wsTarget.Cells(targetRow, 3).NumberFormat = "yyyy-mm-dd"
-            wsTarget.Cells(targetRow, 6).NumberFormat = "0.00%"
-            targetRow = targetRow + 1
-        End If
-    Next sourceRow
-
-    Dim lastDataRow As Long
-    Dim noteRow As Long
-    Dim riskRow As Long
-    Dim fillEndRow As Long
-
-    lastDataRow = targetRow - 1
-    If lastDataRow < 7 Then lastDataRow = 7
-    If lastDataRow >= 8 Then
-        SortStableLongTermRows wsTarget, lastDataRow
-        wsTarget.Range("A8:A" & lastDataRow).ClearContents
-        wsTarget.Range("G8:G" & lastDataRow).ClearContents
+    If themeName = "蓝" Then
+        ws.Cells.Font.Name = FONT_BLUE
+        With ws.Range("B1:F1")
+            .Merge
+            .Value = DisplayTextOrDefault(RowValue(categoryDefinition, "报表主标题"), RowText(categoryDefinition, "分类"))
+            .Interior.Color = COLOR_BLUE_TITLE
+            .HorizontalAlignment = xlCenter
+            .VerticalAlignment = xlCenter
+            .WrapText = True
+            .Font.Name = FONT_BLUE
+            .Font.Bold = True
+            .Font.Size = 20
+            .Font.Color = COLOR_WHITE
+        End With
+        ws.Range("A1:G1").Interior.Color = COLOR_BLUE_TITLE
+        ws.Rows(1).RowHeight = 56
+        InitializeCategoryPage = 2
+    Else
+        ws.Cells.Font.Name = FONT_RED
+        AddRedTitleImage ws
+        With ws.Range("B3:F3")
+            .Merge
+            .Value = DisplayTextOrDefault(RowValue(categoryDefinition, "页内标题"), "热销产品")
+            .Interior.Color = COLOR_DARK_RED
+            .HorizontalAlignment = xlCenter
+            .VerticalAlignment = xlCenter
+            .Font.Bold = True
+            .Font.Size = 24
+            .Font.Color = COLOR_GOLD
+        End With
+        ws.Range("A3:G3").Interior.Color = COLOR_DARK_RED
+        InitializeCategoryPage = 4
     End If
+End Function
 
-    noteRow = lastDataRow + 1
-    riskRow = noteRow + 1
-    fillEndRow = riskRow + 1
-
-    With wsTarget.Range("A3:G" & fillEndRow)
-        .Interior.Color = COLOR_DARK_RED
-    End With
-
-    ApplyFrequencyGroupFillAndMerge wsTarget, 8, lastDataRow
-
-    With wsTarget.Range("B7:F" & lastDataRow)
-        .RowHeight = 20
-        .Font.Name = FONT_NAME
-        .Font.Size = 14
-        .Font.Color = COLOR_WHITE
-        .HorizontalAlignment = xlCenter
-        .VerticalAlignment = xlCenter
-    End With
-    If lastDataRow >= 7 Then
-        wsTarget.Range("B7:B" & lastDataRow).HorizontalAlignment = xlLeft
-    End If
-
-    With wsTarget.Range("B7:F" & lastDataRow).Borders
-        .LineStyle = xlContinuous
-        .Color = COLOR_WHITE
-        .Weight = xlThin
-    End With
-
-    With wsTarget.Range("B7:F7")
-        .Interior.Color = COLOR_DARK_RED
-        .Font.Bold = True
-        .Font.Color = COLOR_GOLD
-    End With
-
-    With wsTarget.Range("B" & noteRow & ":F" & noteRow)
-        .Merge
-        .Value = "*表中数据来源于托管人复核的产品净值数据，数据截至" & Format$(baselineDate, "yyyy-mm-dd") & "，仅供参考，产品有风险，投资需谨慎"
-        .Interior.Color = COLOR_DARK_RED_ALT
-        .HorizontalAlignment = xlCenter
-        .VerticalAlignment = xlCenter
-        .Font.Size = 12
-        .Font.Color = COLOR_GOLD
-    End With
-    ApplyWhiteBorder wsTarget.Range("B" & noteRow & ":F" & noteRow)
-
-    With wsTarget.Range("B" & riskRow & ":F" & riskRow)
-        .Merge
-        .Value = "风险提示:本产品由交银国际信托有限公司发行与管理，交通银行股份有限公司作为代销机构不承担产品的投资、兑付责任；" & vbLf & _
-                 "*请您认真阅读信托合同、产品说明书、风险申明书等法律文件，根据风险承受能力选择合适的产品；" & vbLf & _
-                 "*信托计划不承诺保证本金不受损失或最低收益，过往业绩并不预示其未来表现，产品发行人管理的其他产品的业绩并不构成未来产品业绩表现的保证；" & vbLf & _
-                 "*下表中信托产品的代销机构风险评级为3R-平衡型，该类产品的风险中等，所投资金存在一定亏损风险，收益或利益浮动且有一定波动。"
-        .Interior.Color = COLOR_DARK_RED
-        .HorizontalAlignment = xlLeft
-        .VerticalAlignment = xlCenter
-        .WrapText = True
-        .Font.Size = 10
-        .Font.Color = COLOR_GOLD
-    End With
-    wsTarget.Rows(riskRow).AutoFit
-    If wsTarget.Rows(riskRow).RowHeight < 70 Then wsTarget.Rows(riskRow).RowHeight = 70
-
-    wsTarget.Columns("A").ColumnWidth = 3
-    wsTarget.Columns("G").ColumnWidth = 3
-    wsTarget.Columns("B:F").AutoFit
-End Sub
-
-Private Sub SortStableLongTermRows(ByVal ws As Worksheet, ByVal lastDataRow As Long)
-    If lastDataRow < 8 Then Exit Sub
-
-    With ws.Sort
-        .SortFields.Clear
-        .SortFields.Add Key:=ws.Range("G8:G" & lastDataRow), SortOn:=xlSortOnValues, Order:=xlAscending, DataOption:=xlSortNormal
-        .SortFields.Add Key:=ws.Range("A8:A" & lastDataRow), SortOn:=xlSortOnValues, Order:=xlAscending, DataOption:=xlSortNormal
-        .SetRange ws.Range("A8:G" & lastDataRow)
-        .Header = xlNo
-        .MatchCase = False
-        .Orientation = xlTopToBottom
-        .Apply
-    End With
-End Sub
-
-Private Function BuildSortKey(ByVal value As Variant) As Variant
-    If IsError(value) Or IsEmpty(value) Then
-        BuildSortKey = vbNullString
+Private Function InsertConfiguredCharts(ByVal ws As Worksheet, ByVal categoryName As String, _
+                                        ByVal themeName As String, ByVal firstRow As Long, _
+                                        ByVal chartDefinitions As Collection, ByVal productShortNames As Object, _
+                                        ByVal baselineDate As Date, ByRef missingRequiredImages As String) As Long
+    Dim rows As Collection
+    Set rows = GetSortedRows(chartDefinitions, "分类", categoryName, "位置序号")
+    If rows.Count = 0 Then
+        InsertConfiguredCharts = firstRow
         Exit Function
     End If
 
-    Dim textValue As String
-    textValue = NormalizeText(value)
-    If Len(textValue) = 0 Then
-        BuildSortKey = vbNullString
-    ElseIf IsNumeric(textValue) Then
-        BuildSortKey = CDbl(textValue)
-    Else
-        BuildSortKey = textValue
+    Dim imageFolder As String
+    imageFolder = ThisWorkbook.Path & Application.PathSeparator & _
+                  "产品图表_" & Format$(baselineDate, "yyyymmdd") & Application.PathSeparator
+
+    Dim currentRow As Long
+    currentRow = firstRow
+
+    Dim definition As Variant
+    For Each definition In rows
+        Dim trustCode As String
+        Dim requiredImage As Boolean
+        trustCode = RowText(definition, "信托计划代码")
+        requiredImage = IsEnabledValue(RowValue(definition, "是否必需"))
+
+        ' VBA的块内Dim仍是过程级变量；每轮必须显式清空，避免简称缺失时沿用上一位置的图片。
+        Dim imageName As String
+        Dim imagePath As String
+        Dim missingReason As String
+        imageName = vbNullString
+        imagePath = vbNullString
+        missingReason = vbNullString
+        If productShortNames.Exists(trustCode) Then
+            imageName = CStr(productShortNames(trustCode)) & "_" & themeName & ".png"
+            imagePath = imageFolder & imageName
+        Else
+            missingReason = "产品信息缺少产品简称"
+        End If
+
+        Dim targetRange As Range
+        Set targetRange = DisplayRangeForRow(ws, themeName, currentRow)
+        targetRange.Interior.Color = COLOR_WHITE
+
+        If Len(imagePath) = 0 Or Len(Dir(imagePath)) = 0 Then
+            If Len(missingReason) = 0 Then missingReason = "图片文件缺失：" & imageName
+            If requiredImage Then
+                missingRequiredImages = missingRequiredImages & categoryName & " / " & trustCode & _
+                                        " / " & missingReason & vbCrLf
+            End If
+            targetRange.Merge
+            targetRange.Value = "图表缺失：" & trustCode
+            targetRange.HorizontalAlignment = xlCenter
+            targetRange.VerticalAlignment = xlCenter
+            ws.Rows(currentRow).RowHeight = 80
+        Else
+            InsertPictureFitWidthAndSetRowHeight ws, imagePath, targetRange, currentRow
+        End If
+        currentRow = currentRow + 1
+    Next definition
+
+    InsertConfiguredCharts = currentRow
+End Function
+
+Private Function WriteConfiguredGroups(ByVal wsSource As Worksheet, ByVal wsTarget As Worksheet, _
+                                       ByVal categoryName As String, ByVal themeName As String, _
+                                       ByVal firstRow As Long, ByVal groupDefinitions As Collection, _
+                                       ByVal schemesByName As Object) As Long
+    Dim sourceHeaders As Object
+    Set sourceHeaders = BuildHeaderMap(wsSource, 1)
+
+    Dim groups As Collection
+    Set groups = GetUniqueSortedGroups(groupDefinitions, categoryName)
+
+    Dim currentRow As Long
+    currentRow = firstRow
+
+    Dim groupDefinition As Variant
+    For Each groupDefinition In groups
+        Dim schemeName As String
+        schemeName = RowText(groupDefinition, "输出字段方案")
+        If Not schemesByName.Exists(schemeName) Then
+            Err.Raise vbObjectError + 4201, , "展示分组引用未知输出字段方案：" & schemeName
+        End If
+
+        Dim schemeDefinition As Object
+        Set schemeDefinition = schemesByName(schemeName)
+
+        Dim titleRow As Long
+        Dim headerRow As Long
+        Dim firstDataRow As Long
+        titleRow = currentRow
+        headerRow = titleRow + 1
+        firstDataRow = headerRow + 1
+
+        WriteGroupTitle wsTarget, themeName, titleRow, RowText(groupDefinition, "分组标题")
+        WriteSchemeHeaders wsTarget, themeName, headerRow, schemeDefinition
+
+        Dim sourceRows() As Long
+        Dim sourceRowCount As Long
+        CollectAndSortSourceRows wsSource, sourceHeaders, categoryName, _
+                                 RowText(groupDefinition, "展示分组"), groupDefinitions, _
+                                 sourceRows, sourceRowCount
+
+        Dim dataIndex As Long
+        For dataIndex = 1 To sourceRowCount
+            WriteSchemeDataRow wsSource, sourceHeaders, sourceRows(dataIndex), wsTarget, _
+                               firstDataRow + dataIndex - 1, themeName, schemeDefinition
+        Next dataIndex
+
+        Dim lastBlockRow As Long
+        If sourceRowCount = 0 Then
+            lastBlockRow = headerRow
+        Else
+            lastBlockRow = firstDataRow + sourceRowCount - 1
+        End If
+        FormatGroupBlock wsTarget, themeName, headerRow, lastBlockRow
+        If themeName <> "蓝" And sourceRowCount > 0 Then
+            ApplyRedFrequencyGroups wsSource, sourceHeaders, sourceRows, sourceRowCount, _
+                                    wsTarget, firstDataRow, schemeDefinition
+        End If
+        currentRow = lastBlockRow + 1
+    Next groupDefinition
+
+    WriteConfiguredGroups = currentRow
+End Function
+
+Private Sub WriteGroupTitle(ByVal ws As Worksheet, ByVal themeName As String, ByVal rowNumber As Long, _
+                            ByVal titleText As String)
+    Dim targetRange As Range
+    Set targetRange = DisplayRangeForRow(ws, themeName, rowNumber)
+    targetRange.Merge
+    targetRange.Value = titleText
+    targetRange.HorizontalAlignment = xlCenter
+    targetRange.VerticalAlignment = xlCenter
+    targetRange.Font.Bold = True
+    targetRange.Font.Size = IIf(themeName = "蓝", 16, 24)
+    targetRange.Font.Color = IIf(themeName = "蓝", COLOR_WHITE, COLOR_GOLD)
+    targetRange.Interior.Color = IIf(themeName = "蓝", COLOR_BLUE_TITLE, COLOR_DARK_RED)
+End Sub
+
+Private Sub WriteSchemeHeaders(ByVal ws As Worksheet, ByVal themeName As String, ByVal rowNumber As Long, _
+                               ByVal scheme As Object)
+    Dim startColumn As Long
+    startColumn = DisplayStartColumn(themeName)
+
+    Dim slot As Long
+    For slot = 1 To 5
+        ws.Cells(rowNumber, startColumn + slot - 1).Value = RowText(scheme, "字段" & slot & "标题")
+    Next slot
+End Sub
+
+Private Sub WriteSchemeDataRow(ByVal wsSource As Worksheet, ByVal sourceHeaders As Object, _
+                               ByVal sourceRow As Long, ByVal wsTarget As Worksheet, _
+                               ByVal targetRow As Long, ByVal themeName As String, ByVal scheme As Object)
+    Dim startColumn As Long
+    startColumn = DisplayStartColumn(themeName)
+
+    Dim slot As Long
+    For slot = 1 To 5
+        Dim fieldId As String
+        fieldId = UCase$(RowText(scheme, "字段" & slot))
+        WriteConfiguredField wsSource, sourceHeaders, sourceRow, _
+                             wsTarget.Cells(targetRow, startColumn + slot - 1), fieldId
+    Next slot
+End Sub
+
+Private Sub WriteConfiguredField(ByVal wsSource As Worksheet, ByVal headers As Object, _
+                                 ByVal sourceRow As Long, ByVal targetCell As Range, _
+                                 ByVal fieldId As String)
+    If Len(fieldId) = 0 Then
+        targetCell.ClearContents
+        Exit Sub
     End If
+
+    Dim sourceHeader As String
+    Select Case fieldId
+        Case "PRODUCT_NAME": sourceHeader = COL_PRODUCT_NAME
+        Case "NEXT_OPEN": sourceHeader = COL_NEXT_OPEN
+        Case "BENCHMARK_RATE": sourceHeader = COL_BENCHMARK_RATE
+        Case "ELAPSED_DAYS": sourceHeader = COL_ELAPSED
+        Case "PREV_PERIOD_ANNUAL": sourceHeader = COL_PREV_PERIOD_ANNUAL
+        Case "CURRENT_PERIOD_ANNUAL": sourceHeader = COL_CURRENT_PERIOD_ANNUAL
+        Case "ANNUAL_7D": sourceHeader = COL_7DAY_ANNUAL
+        Case "ANNUAL_28D": sourceHeader = COL_28DAY_ANNUAL
+        Case "INCEPTION_ANNUAL": sourceHeader = COL_INCEPTION_ANNUAL
+        Case "OPEN_FREQUENCY"
+            If headers.Exists(COL_THEORETICAL_INTERVAL) Then
+                targetCell.Value = FormatOpenFrequency(wsSource.Cells(sourceRow, CLng(headers(COL_THEORETICAL_INTERVAL))).Value)
+            Else
+                targetCell.Value = "\"
+            End If
+            Exit Sub
+        Case Else
+            Err.Raise vbObjectError + 4202, , "未知展示指标：" & fieldId
+    End Select
+
+    If Not headers.Exists(sourceHeader) Then Err.Raise vbObjectError + 4203, , "分类表现缺少字段：" & sourceHeader
+
+    Dim value As Variant
+    value = wsSource.Cells(sourceRow, CLng(headers(sourceHeader))).Value
+    If IsError(value) Or IsEmpty(value) Or IsNull(value) Or Len(NormalizeText(value)) = 0 Then
+        targetCell.Value = "\"
+    Else
+        targetCell.Value = value
+        If fieldId = "NEXT_OPEN" Then
+            targetCell.NumberFormat = "yyyy-mm-dd"
+        ElseIf IsPercentField(fieldId) Then
+            targetCell.NumberFormat = "0.00%"
+        End If
+    End If
+End Sub
+
+Private Sub FormatGroupBlock(ByVal ws As Worksheet, ByVal themeName As String, ByVal headerRow As Long, _
+                             ByVal lastRow As Long)
+    Dim startColumn As Long
+    startColumn = DisplayStartColumn(themeName)
+
+    Dim block As Range
+    Set block = ws.Range(ws.Cells(headerRow, startColumn), ws.Cells(lastRow, startColumn + 4))
+    With block
+        .RowHeight = 22
+        .Font.Name = IIf(themeName = "蓝", FONT_BLUE, FONT_RED)
+        .Font.Size = 14
+        .HorizontalAlignment = xlCenter
+        .VerticalAlignment = xlCenter
+        .WrapText = True
+    End With
+
+    With ws.Range(ws.Cells(headerRow, startColumn), ws.Cells(headerRow, startColumn + 4))
+        .Interior.Color = IIf(themeName = "蓝", COLOR_BLUE_TITLE, COLOR_DARK_RED)
+        .Font.Bold = True
+        .Font.Color = IIf(themeName = "蓝", COLOR_WHITE, COLOR_GOLD)
+    End With
+
+    If lastRow > headerRow Then
+        Dim dataRange As Range
+        Set dataRange = ws.Range(ws.Cells(headerRow + 1, startColumn), ws.Cells(lastRow, startColumn + 4))
+        If themeName = "蓝" Then
+            dataRange.Interior.Color = COLOR_BLUE_RECORD
+            dataRange.Font.Color = COLOR_BLACK
+        Else
+            dataRange.Interior.Color = COLOR_DARK_RED
+            dataRange.Font.Color = COLOR_WHITE
+        End If
+        ws.Range(ws.Cells(headerRow + 1, startColumn), ws.Cells(lastRow, startColumn)).HorizontalAlignment = xlLeft
+    End If
+
+    ApplyWhiteBorder block
+End Sub
+
+Private Sub ApplyRedFrequencyGroups(ByVal wsSource As Worksheet, ByVal sourceHeaders As Object, _
+                                    ByRef sourceRows() As Long, ByVal sourceRowCount As Long, _
+                                    ByVal wsTarget As Worksheet, ByVal firstDataRow As Long, _
+                                    ByVal scheme As Object)
+    Dim currentStep As String
+    On Error GoTo ApplyFail
+    If sourceRowCount = 0 Then Exit Sub
+    If Not sourceHeaders.Exists(COL_THEORETICAL_INTERVAL) Then Exit Sub
+
+    Dim frequencySlot As Long
+    frequencySlot = FindSchemeFieldSlot(scheme, "OPEN_FREQUENCY")
+
+    Dim groupStartIndex As Long
+    Dim groupEndIndex As Long
+    Dim groupIndex As Long
+    groupStartIndex = 1
+
+    Do While groupStartIndex <= sourceRowCount
+        currentStep = "读取第" & CStr(groupStartIndex) & "条开放频率"
+        Dim frequencyText As String
+        frequencyText = NormalizeText(wsSource.Cells(sourceRows(groupStartIndex), _
+                                      CLng(sourceHeaders(COL_THEORETICAL_INTERVAL))).Value)
+        groupEndIndex = groupStartIndex
+        ' VBA的And不会短路；先检查数组边界，再读取下一项。
+        Do While groupEndIndex < sourceRowCount
+            If NormalizeText(wsSource.Cells(sourceRows(groupEndIndex + 1), _
+                             CLng(sourceHeaders(COL_THEORETICAL_INTERVAL))).Value) <> frequencyText Then Exit Do
+            groupEndIndex = groupEndIndex + 1
+        Loop
+
+        Dim targetGroupStart As Long
+        Dim targetGroupEnd As Long
+        targetGroupStart = firstDataRow + groupStartIndex - 1
+        targetGroupEnd = firstDataRow + groupEndIndex - 1
+
+        Dim fillColor As Long
+        If groupIndex Mod 2 = 0 Then
+            fillColor = COLOR_DARK_RED
+        Else
+            fillColor = COLOR_DARK_RED_ALT
+        End If
+        wsTarget.Range(wsTarget.Cells(targetGroupStart, REPORT_START_COLUMN), _
+                       wsTarget.Cells(targetGroupEnd, REPORT_START_COLUMN + _
+                                      REPORT_CONTENT_COLUMN_COUNT - 1)).Interior.Color = fillColor
+
+        ' 只有字段方案实际展示开放频率时才合并该列。
+        If frequencySlot > 0 Then
+            Dim frequencyColumn As Long
+            frequencyColumn = REPORT_START_COLUMN + frequencySlot - 1
+            Dim frequencyRange As Range
+            Set frequencyRange = wsTarget.Range(wsTarget.Cells(targetGroupStart, frequencyColumn), _
+                                                wsTarget.Cells(targetGroupEnd, frequencyColumn))
+            If targetGroupEnd > targetGroupStart Then
+                Dim oldDisplayAlerts As Boolean
+                oldDisplayAlerts = Application.DisplayAlerts
+                Application.DisplayAlerts = False
+                frequencyRange.Merge
+                Application.DisplayAlerts = oldDisplayAlerts
+            End If
+            frequencyRange.HorizontalAlignment = xlCenter
+            frequencyRange.VerticalAlignment = xlCenter
+            ApplyWhiteBorder frequencyRange
+        End If
+
+        groupStartIndex = groupEndIndex + 1
+        groupIndex = groupIndex + 1
+    Loop
+    Exit Sub
+
+ApplyFail:
+    Dim errorDescription As String
+    errorDescription = Err.Description
+    Err.Raise vbObjectError + 4210, , "按开放频率设置红色分组（" & currentStep & "）失败：" & errorDescription
+End Sub
+
+Private Function FindSchemeFieldSlot(ByVal scheme As Object, ByVal fieldId As String) As Long
+    Dim slot As Long
+    For slot = 1 To REPORT_CONTENT_COLUMN_COUNT
+        If StrComp(RowText(scheme, "字段" & slot), fieldId, vbTextCompare) = 0 Then
+            FindSchemeFieldSlot = slot
+            Exit Function
+        End If
+    Next slot
+End Function
+
+Private Sub FinishCategoryPage(ByVal ws As Worksheet, ByVal themeName As String, ByVal nextRow As Long, _
+                               ByVal baselineDate As Date)
+    Dim startColumn As Long
+    startColumn = DisplayStartColumn(themeName)
+
+    Dim noteRange As Range
+    Set noteRange = ws.Range(ws.Cells(nextRow, startColumn), ws.Cells(nextRow, startColumn + 4))
+    noteRange.Merge
+    noteRange.Value = "*表中数据来源于托管人复核的产品净值数据，数据截至" & _
+                      Format$(baselineDate, "yyyy-mm-dd") & "，仅供参考，产品有风险，投资需谨慎"
+    noteRange.HorizontalAlignment = xlCenter
+    noteRange.VerticalAlignment = xlCenter
+    noteRange.Font.Size = 12
+
+    Dim riskRange As Range
+    Set riskRange = ws.Range(ws.Cells(nextRow + 1, startColumn), ws.Cells(nextRow + 1, startColumn + 4))
+    riskRange.Merge
+    riskRange.Value = "风险提示:本产品由交银国际信托有限公司发行与管理，交通银行股份有限公司作为代销机构不承担产品的投资、兑付责任；" & vbLf & _
+                      "*请您认真阅读信托合同、产品说明书、风险申明书等法律文件，根据风险承受能力选择合适的产品；" & vbLf & _
+                      "*信托计划不承诺保证本金不受损失或最低收益，过往业绩并不预示其未来表现，产品发行人管理的其他产品的业绩并不构成未来产品业绩表现的保证；" & vbLf & _
+                      "*下表中信托产品的代销机构风险评级为3R-平衡型，该类产品的风险中等，所投资金存在一定亏损风险，收益或利益浮动且有一定波动。"
+    riskRange.HorizontalAlignment = xlLeft
+    riskRange.VerticalAlignment = xlCenter
+    riskRange.WrapText = True
+    riskRange.Font.Size = 10
+
+    If themeName = "蓝" Then
+        noteRange.Interior.Color = COLOR_BLUE_TITLE
+        noteRange.Font.Color = COLOR_WHITE
+        riskRange.Interior.Color = COLOR_BLUE_TITLE
+        riskRange.Font.Color = COLOR_WHITE
+    Else
+        noteRange.Interior.Color = COLOR_DARK_RED_ALT
+        noteRange.Font.Color = COLOR_GOLD
+        riskRange.Interior.Color = COLOR_DARK_RED
+        riskRange.Font.Color = COLOR_GOLD
+    End If
+
+    ApplyWhiteBorder noteRange
+    riskRange.Borders.LineStyle = xlNone
+    ws.Rows(nextRow + 1).AutoFit
+    If ws.Rows(nextRow + 1).RowHeight < 70 Then ws.Rows(nextRow + 1).RowHeight = 70
+
+    ' 先确定最终B:F列宽，再按最终宽度等比例重排图片。
+    ws.Range(ws.Cells(1, REPORT_START_COLUMN), _
+             ws.Cells(nextRow + 1, REPORT_START_COLUMN + REPORT_CONTENT_COLUMN_COUNT - 1)).Columns.AutoFit
+    ApplyDecorationColumns ws, themeName, nextRow + 1
+    RefitReportPictures ws
+End Sub
+
+Private Sub CollectAndSortSourceRows(ByVal wsSource As Worksheet, ByVal headers As Object, _
+                                     ByVal categoryName As String, ByVal groupName As String, _
+                                     ByVal groupDefinitions As Collection, ByRef rowIndexes() As Long, _
+                                     ByRef rowCount As Long)
+    ' rowIndexes/rowCount由多个展示分组复用；每次调用必须从空结果开始。
+    ' VBA循环块没有独立变量作用域，不显式清空会把前一分组继续带入下一分组。
+    rowCount = 0
+    Erase rowIndexes
+
+    Dim allowedSeries As Object
+    Set allowedSeries = CreateTextDictionary()
+
+    Dim definition As Variant
+    For Each definition In groupDefinitions
+        If StrComp(RowText(definition, "分类"), categoryName, vbTextCompare) = 0 And _
+           StrComp(RowText(definition, "展示分组"), groupName, vbTextCompare) = 0 Then
+            allowedSeries(RowText(definition, "产品系列")) = True
+        End If
+    Next definition
+
+    Dim lastRow As Long
+    lastRow = LastUsedRow(wsSource)
+    Dim r As Long
+    For r = 2 To lastRow
+        If StrComp(NormalizeText(wsSource.Cells(r, CLng(headers(COL_CATEGORY))).Value), categoryName, vbTextCompare) = 0 And _
+           allowedSeries.Exists(NormalizeText(wsSource.Cells(r, CLng(headers(COL_SERIES))).Value)) Then
+            rowCount = rowCount + 1
+            ReDim Preserve rowIndexes(1 To rowCount)
+            rowIndexes(rowCount) = r
+        End If
+    Next r
+
+    Dim i As Long
+    Dim j As Long
+    For i = 1 To rowCount - 1
+        For j = i + 1 To rowCount
+            If CompareSourceRows(wsSource, headers, rowIndexes(i), rowIndexes(j)) > 0 Then
+                Dim tempRow As Long
+                tempRow = rowIndexes(i)
+                rowIndexes(i) = rowIndexes(j)
+                rowIndexes(j) = tempRow
+            End If
+        Next j
+    Next i
+End Sub
+
+Private Function CompareSourceRows(ByVal ws As Worksheet, ByVal headers As Object, _
+                                   ByVal leftRow As Long, ByVal rightRow As Long) As Long
+    Dim leftInterval As Double
+    Dim rightInterval As Double
+    leftInterval = NumericSortValue(ws.Cells(leftRow, CLng(headers(COL_THEORETICAL_INTERVAL))).Value)
+    rightInterval = NumericSortValue(ws.Cells(rightRow, CLng(headers(COL_THEORETICAL_INTERVAL))).Value)
+
+    If leftInterval < rightInterval Then
+        CompareSourceRows = -1
+    ElseIf leftInterval > rightInterval Then
+        CompareSourceRows = 1
+    Else
+        Dim leftSeq As Double
+        Dim rightSeq As Double
+        leftSeq = NumericSortValue(ws.Cells(leftRow, CLng(headers(COL_SEQ))).Value)
+        rightSeq = NumericSortValue(ws.Cells(rightRow, CLng(headers(COL_SEQ))).Value)
+        CompareSourceRows = Sgn(leftSeq - rightSeq)
+    End If
+End Function
+
+Private Function GetSortedEnabledCategories(ByVal definitions As Collection) As Collection
+    Dim filtered As New Collection
+    Dim definition As Variant
+    For Each definition In definitions
+        If IsEnabledValue(RowValue(definition, "是否启用")) Then filtered.Add definition
+    Next definition
+    Set GetSortedEnabledCategories = SortRowsByNumericField(filtered, "工作表顺序")
+End Function
+
+Private Function GetUniqueSortedGroups(ByVal definitions As Collection, ByVal categoryName As String) As Collection
+    Dim result As New Collection
+    Dim seen As Object
+    Set seen = CreateTextDictionary()
+
+    Dim definition As Variant
+    For Each definition In definitions
+        If StrComp(RowText(definition, "分类"), categoryName, vbTextCompare) = 0 Then
+            Dim groupName As String
+            groupName = RowText(definition, "展示分组")
+            If Not seen.Exists(groupName) Then
+                seen.Add groupName, True
+                result.Add definition
+            End If
+        End If
+    Next definition
+
+    Set GetUniqueSortedGroups = SortRowsByNumericField(result, "分组顺序")
+End Function
+
+Private Function GetSortedRows(ByVal definitions As Collection, ByVal filterField As String, _
+                               ByVal filterValue As String, ByVal sortField As String) As Collection
+    Dim result As New Collection
+    Dim definition As Variant
+    For Each definition In definitions
+        If StrComp(RowText(definition, filterField), filterValue, vbTextCompare) = 0 Then result.Add definition
+    Next definition
+    Set GetSortedRows = SortRowsByNumericField(result, sortField)
+End Function
+
+Private Function SortRowsByNumericField(ByVal rows As Collection, ByVal fieldName As String) As Collection
+    Dim result As New Collection
+    Dim used() As Boolean
+    If rows.Count = 0 Then
+        Set SortRowsByNumericField = result
+        Exit Function
+    End If
+    ReDim used(1 To rows.Count)
+
+    Dim outputIndex As Long
+    Dim bestIndex As Long
+    Dim bestValue As Double
+    Dim i As Long
+    For outputIndex = 1 To rows.Count
+        bestIndex = 0
+        bestValue = 0
+        For i = 1 To rows.Count
+            If Not used(i) Then
+                Dim candidateValue As Double
+                candidateValue = NumericSortValue(RowValue(rows(i), fieldName))
+                If bestIndex = 0 Or candidateValue < bestValue Then
+                    bestIndex = i
+                    bestValue = candidateValue
+                End If
+            End If
+        Next i
+        used(bestIndex) = True
+        result.Add rows(bestIndex)
+    Next outputIndex
+
+    Set SortRowsByNumericField = result
+End Function
+
+Private Function IndexRowsByKey(ByVal rows As Collection, ByVal keyField As String) As Object
+    Dim result As Object
+    Set result = CreateTextDictionary()
+    Dim row As Variant
+    For Each row In rows
+        Set result.Item(RowText(row, keyField)) = row
+    Next row
+    Set IndexRowsByKey = result
+End Function
+
+Private Function BuildProductShortNameMap() As Object
+    Dim result As Object
+    Set result = CreateTextDictionary()
+
+    Dim ws As Worksheet
+    Set ws = ThisWorkbook.Worksheets(SHEET_PRODUCT_INFO)
+    Dim headers As Object
+    Set headers = BuildHeaderMap(ws, 1)
+    If Not headers.Exists(COL_TRUST_CODE) Or Not headers.Exists(COL_PRODUCT_SHORT) Then
+        Err.Raise vbObjectError + 4204, , SHEET_PRODUCT_INFO & "缺少信托计划代码或产品简称。"
+    End If
+
+    Dim lastRow As Long
+    lastRow = LastUsedRow(ws)
+    Dim r As Long
+    For r = 2 To lastRow
+        Dim trustCode As String
+        Dim shortName As String
+        trustCode = NormalizeText(ws.Cells(r, CLng(headers(COL_TRUST_CODE))).Value)
+        shortName = NormalizeText(ws.Cells(r, CLng(headers(COL_PRODUCT_SHORT))).Value)
+        If Len(trustCode) > 0 And Len(shortName) > 0 Then result(trustCode) = shortName
+    Next r
+
+    Set BuildProductShortNameMap = result
 End Function
 
 Private Function FormatOpenFrequency(ByVal value As Variant) As Variant
-    If IsError(value) Or IsEmpty(value) Then
-        FormatOpenFrequency = value
-        Exit Function
-    End If
-
     Dim textValue As String
     textValue = NormalizeText(value)
     If Len(textValue) = 0 Then
-        FormatOpenFrequency = value
+        FormatOpenFrequency = "\"
     ElseIf textValue = "63" Then
         FormatOpenFrequency = "每2个月"
     ElseIf textValue = "154" Then
         FormatOpenFrequency = "每5个月"
+    ElseIf textValue = "183" Then
+        FormatOpenFrequency = "每月最后一个周三"
     ElseIf IsNumeric(textValue) Then
         FormatOpenFrequency = "每" & textValue & "天"
     Else
         FormatOpenFrequency = value
     End If
+End Function
+
+Private Function IsPercentField(ByVal fieldId As String) As Boolean
+    IsPercentField = (fieldId = "BENCHMARK_RATE" Or fieldId = "PREV_PERIOD_ANNUAL" Or _
+                      fieldId = "CURRENT_PERIOD_ANNUAL" Or fieldId = "ANNUAL_7D" Or _
+                      fieldId = "ANNUAL_28D" Or fieldId = "INCEPTION_ANNUAL")
+End Function
+
+Private Function DisplayStartColumn(ByVal themeName As String) As Long
+    DisplayStartColumn = REPORT_START_COLUMN
+End Function
+
+Private Function DisplayRangeForRow(ByVal ws As Worksheet, ByVal themeName As String, _
+                                    ByVal rowNumber As Long) As Range
+    Dim startColumn As Long
+    startColumn = DisplayStartColumn(themeName)
+    Set DisplayRangeForRow = ws.Range(ws.Cells(rowNumber, startColumn), _
+                                      ws.Cells(rowNumber, startColumn + REPORT_CONTENT_COLUMN_COUNT - 1))
+End Function
+
+Private Sub ApplyBaseThemeLayout(ByVal ws As Worksheet, ByVal themeName As String)
+    ws.Columns("A").ColumnWidth = DECORATION_COLUMN_WIDTH
+    ws.Columns("G").ColumnWidth = DECORATION_COLUMN_WIDTH
+End Sub
+
+Private Sub ApplyDecorationColumns(ByVal ws As Worksheet, ByVal themeName As String, ByVal lastRow As Long)
+    ws.Columns("A").ColumnWidth = DECORATION_COLUMN_WIDTH
+    ws.Columns("G").ColumnWidth = DECORATION_COLUMN_WIDTH
+    ws.Range("A1:A" & lastRow).Interior.Color = ThemeMainColor(themeName)
+    ws.Range("G1:G" & lastRow).Interior.Color = ThemeMainColor(themeName)
+End Sub
+
+Private Function ThemeMainColor(ByVal themeName As String) As Long
+    If themeName = "蓝" Then
+        ThemeMainColor = COLOR_BLUE_TITLE
+    Else
+        ThemeMainColor = COLOR_DARK_RED
+    End If
+End Function
+
+Private Sub AddRedTitleImage(ByVal ws As Worksheet)
+    Dim imagePath As String
+    imagePath = AssetImagePath(TITLE_IMAGE_NAME)
+    If Len(Dir(imagePath)) = 0 Then Exit Sub
+
+    Dim targetRange As Range
+    Set targetRange = ws.Range("B1:F2")
+    Dim shape As Shape
+    Set shape = ws.Shapes.AddPicture(imagePath, msoFalse, msoTrue, targetRange.Left, targetRange.Top, -1, -1)
+    shape.Name = "report_title"
+    FitPictureToRangeWidth shape, targetRange
+    ws.Rows(1).RowHeight = shape.Height / 2
+    ws.Rows(2).RowHeight = shape.Height / 2
+End Sub
+
+Private Sub InsertPictureFitWidthAndSetRowHeight(ByVal ws As Worksheet, ByVal imagePath As String, _
+                                                  ByVal targetRange As Range, ByVal rowNumber As Long)
+    Dim shape As Shape
+    Set shape = ws.Shapes.AddPicture(imagePath, msoFalse, msoTrue, _
+                                     targetRange.Left, targetRange.Top, -1, -1)
+    shape.Name = "report_chart_" & CStr(rowNumber)
+    FitPictureToRangeWidth shape, targetRange
+
+    Dim newHeight As Double
+    newHeight = shape.Height + 2
+    If newHeight > 409.5 Then newHeight = 409.5
+    ws.Rows(rowNumber).RowHeight = newHeight
+End Sub
+
+Private Sub RefitReportPictures(ByVal ws As Worksheet)
+    Dim shape As Shape
+    On Error Resume Next
+    Set shape = ws.Shapes("report_title")
+    On Error GoTo 0
+    If Not shape Is Nothing Then
+        FitPictureToRangeWidth shape, ws.Range("B1:F2")
+        ws.Rows(1).RowHeight = shape.Height / 2
+        ws.Rows(2).RowHeight = shape.Height / 2
+    End If
+
+    For Each shape In ws.Shapes
+        If Left$(shape.Name, Len("report_chart_")) = "report_chart_" Then
+            Dim rowNumber As Long
+            rowNumber = CLng(Mid$(shape.Name, Len("report_chart_") + 1))
+            FitPictureToRangeWidth shape, DisplayRangeForRow(ws, vbNullString, rowNumber)
+            Dim newHeight As Double
+            newHeight = shape.Height + 2
+            If newHeight > 409.5 Then newHeight = 409.5
+            ws.Rows(rowNumber).RowHeight = newHeight
+        End If
+    Next shape
+End Sub
+
+Private Sub FitPictureToRangeWidth(ByVal shape As Shape, ByVal targetRange As Range)
+    shape.Placement = xlMove
+    shape.LockAspectRatio = msoTrue
+    shape.Width = targetRange.Width
+    shape.Left = targetRange.Left
+    shape.Top = targetRange.Top
+End Sub
+
+Private Function AssetImagePath(ByVal imageName As String) As String
+    AssetImagePath = ThisWorkbook.Path & Application.PathSeparator & _
+                     Replace(ASSET_IMAGE_FOLDER, "\", Application.PathSeparator) & _
+                     Application.PathSeparator & imageName
 End Function
 
 Private Sub ApplyWhiteBorder(ByVal targetRange As Range)
@@ -376,1174 +949,125 @@ Private Sub ApplyWhiteBorder(ByVal targetRange As Range)
     End With
 End Sub
 
-Private Sub WriteDirectSalesReport(ByVal wsSource As Worksheet, ByVal wsTarget As Worksheet, ByVal baselineDate As Date)
-    Dim currentRow As Long
-    Dim noteRow As Long
-    Dim riskRow As Long
-    Dim fillEndRow As Long
-
-    wsTarget.Cells.ClearFormats
-    wsTarget.Cells.Font.Name = FONT_NAME
-
-    With wsTarget.Range("B3:F3")
-        .Merge
-        .Value = "热销产品"
-        .HorizontalAlignment = xlCenter
-        .VerticalAlignment = xlCenter
-        .Font.Bold = True
-        .Font.Size = 24
-        .Font.Color = COLOR_GOLD
-    End With
-
-    currentRow = 7
-    currentRow = WriteDirectSection(wsSource, wsTarget, currentRow, "汇益稳健系列兑付业绩", "稳健", 1, baselineDate)
-    currentRow = WriteDirectSection(wsSource, wsTarget, currentRow, "汇益系列兑付业绩", "汇益", 2, baselineDate)
-    currentRow = WriteDirectSection(wsSource, wsTarget, currentRow, "交鑫致远系列兑付业绩", "交鑫致远", 3, baselineDate)
-
-    noteRow = currentRow
-    riskRow = noteRow + 1
-    fillEndRow = riskRow + 1
-
-    wsTarget.Range("A3:A" & fillEndRow).Interior.Color = COLOR_DARK_RED
-    wsTarget.Range("G3:G" & fillEndRow).Interior.Color = COLOR_DARK_RED
-    wsTarget.Range("B3:F6").Interior.Color = COLOR_DARK_RED
-    wsTarget.Range("B" & fillEndRow & ":F" & fillEndRow).Interior.Color = COLOR_DARK_RED
-
-    With wsTarget.Range("B" & noteRow & ":F" & noteRow)
-        .Merge
-        .Value = "*表中数据来源于托管人复核的产品净值数据，数据截至" & Format$(baselineDate, "yyyy-mm-dd") & "，仅供参考，产品有风险，投资需谨慎"
-        .Interior.Color = COLOR_DARK_RED_ALT
-        .HorizontalAlignment = xlCenter
-        .VerticalAlignment = xlCenter
-        .Font.Size = 12
-        .Font.Color = COLOR_GOLD
-    End With
-    ApplyWhiteBorder wsTarget.Range("B" & noteRow & ":F" & noteRow)
-
-    With wsTarget.Range("B" & riskRow & ":F" & riskRow)
-        .Merge
-        .Value = "风险提示:本产品由交银国际信托有限公司发行与管理，交通银行股份有限公司作为代销机构不承担产品的投资、兑付责任；" & vbLf & _
-                 "*请您认真阅读信托合同、产品说明书、风险申明书等法律文件，根据风险承受能力选择合适的产品；" & vbLf & _
-                 "*信托计划不承诺保证本金不受损失或最低收益，过往业绩并不预示其未来表现，产品发行人管理的其他产品的业绩并不构成未来产品业绩表现的保证；" & vbLf & _
-                 "*下表中信托产品的代销机构风险评级为3R-平衡型，该类产品的风险中等，所投资金存在一定亏损风险，收益或利益浮动且有一定波动。"
-        .Interior.Color = COLOR_DARK_RED
-        .HorizontalAlignment = xlLeft
-        .VerticalAlignment = xlCenter
-        .WrapText = True
-        .Font.Size = 10
-        .Font.Color = COLOR_GOLD
-    End With
-    wsTarget.Rows(riskRow).AutoFit
-    If wsTarget.Rows(riskRow).RowHeight < 70 Then wsTarget.Rows(riskRow).RowHeight = 70
-
-    wsTarget.Columns("A").ColumnWidth = 3
-    wsTarget.Columns("G").ColumnWidth = 3
-    wsTarget.Columns("B:F").AutoFit
-End Sub
-
-Private Function WriteDirectSection(ByVal wsSource As Worksheet, ByVal wsTarget As Worksheet, _
-                                    ByVal titleRow As Long, ByVal titleText As String, _
-                                    ByVal seriesKeyword As String, ByVal sectionType As Long, _
-                                    ByVal baselineDate As Date) As Long
-    Dim headerRow As Long
-    Dim firstDataRow As Long
-    Dim lastDataRow As Long
-    Dim nextRow As Long
-    Dim sourceRow As Long
-    Dim lastSourceRow As Long
-    Dim intervalValue As Variant
-
-    With wsTarget.Range("B" & titleRow & ":F" & titleRow)
-        .Merge
-        .Value = titleText
-        .HorizontalAlignment = xlCenter
-        .VerticalAlignment = xlCenter
-        .Font.Bold = True
-        .Font.Size = 24
-        .Font.Color = COLOR_GOLD
-        .Interior.Color = COLOR_DARK_RED
-    End With
-
-    headerRow = titleRow + 1
-    firstDataRow = headerRow + 1
-    nextRow = firstDataRow
-
-    WriteDirectSectionHeaders wsTarget, headerRow, sectionType
-
-    lastSourceRow = LastUsedRow(wsSource)
-    For sourceRow = 2 To lastSourceRow
-        If IsDirectSeriesMatch(wsSource.Cells(sourceRow, DIRECT_COL_SERIES).Value, seriesKeyword, sectionType) Then
-            wsTarget.Cells(nextRow, 1).Value = BuildSortKey(wsSource.Cells(sourceRow, DIRECT_COL_SEQ).Value)
-            wsTarget.Cells(nextRow, 2).Value = wsSource.Cells(sourceRow, DIRECT_COL_PRODUCT_NAME).Value
-
-            intervalValue = wsSource.Cells(sourceRow, DIRECT_COL_THEORETICAL_INTERVAL).Value
-            WriteNextOpenDateCell wsTarget.Cells(nextRow, 3), wsSource.Cells(sourceRow, DIRECT_COL_NEXT_OPEN).Value, intervalValue, baselineDate
-            If sectionType = 3 Then
-                wsTarget.Cells(nextRow, 4).Value = "每月最后一个周三的工作日"
-                wsTarget.Cells(nextRow, 7).Value = 9999
-            Else
-                wsTarget.Cells(nextRow, 4).Value = FormatOpenFrequency(intervalValue)
-                wsTarget.Cells(nextRow, 7).Value = BuildSortKey(intervalValue)
-            End If
-
-            If sectionType = 1 Then
-                wsTarget.Cells(nextRow, 5).Value = wsSource.Cells(sourceRow, DIRECT_COL_7DAY_ANNUAL).Value
-                wsTarget.Cells(nextRow, 6).Value = wsSource.Cells(sourceRow, DIRECT_COL_28DAY_ANNUAL).Value
-            ElseIf sectionType = 2 Then
-                wsTarget.Cells(nextRow, 5).Value = wsSource.Cells(sourceRow, DIRECT_COL_BENCHMARK_RATE).Value
-                wsTarget.Cells(nextRow, 6).Value = wsSource.Cells(sourceRow, DIRECT_COL_28DAY_ANNUAL).Value
-            Else
-                wsTarget.Cells(nextRow, 6).Value = wsSource.Cells(sourceRow, DIRECT_COL_INCEPTION_ANNUAL).Value
-            End If
-
-            wsTarget.Range("E" & nextRow & ":F" & nextRow).NumberFormat = "0.00%"
-            nextRow = nextRow + 1
-        End If
-    Next sourceRow
-
-    lastDataRow = nextRow - 1
-    If lastDataRow >= firstDataRow Then
-        SortDirectSectionRows wsTarget, firstDataRow, lastDataRow
-        wsTarget.Range("A" & firstDataRow & ":A" & lastDataRow).ClearContents
-        wsTarget.Range("G" & firstDataRow & ":G" & lastDataRow).ClearContents
-        ApplyDirectSectionFrequencyFillAndMerge wsTarget, firstDataRow, lastDataRow, sectionType
-    End If
-
-    FormatDirectSectionBlock wsTarget, headerRow, IIf(lastDataRow >= firstDataRow, lastDataRow, headerRow), sectionType
-    WriteDirectSection = IIf(lastDataRow >= firstDataRow, lastDataRow + 1, headerRow + 1)
-End Function
-
-Private Sub WriteDirectSectionHeaders(ByVal ws As Worksheet, ByVal headerRow As Long, ByVal sectionType As Long)
-    ws.Range("B" & headerRow).Value = IIf(sectionType = 1, "净值型产品名称", IIf(sectionType = 2, "报价型产品名称", "长期限产品名称"))
-    ws.Range("C" & headerRow).Value = "下一开放日"
-    ws.Range("D" & headerRow).Value = "开放频率"
-
-    If sectionType = 1 Then
-        ws.Range("E" & headerRow).Value = "7日年化收益率"
-        ws.Range("F" & headerRow).Value = "28日年化收益率"
-    ElseIf sectionType = 2 Then
-        ws.Range("E" & headerRow).Value = "基准"
-        ws.Range("F" & headerRow).Value = "28日年化收益率"
+Private Function DisplayTextOrDefault(ByVal value As Variant, ByVal defaultText As String) As String
+    Dim textValue As String
+    textValue = NormalizeText(value)
+    If Len(textValue) = 0 Then
+        DisplayTextOrDefault = defaultText
     Else
-        With ws.Range("D" & headerRow & ":E" & headerRow)
-            .Merge
-            .Value = "开放频率"
-        End With
-        ws.Range("F" & headerRow).Value = "成立以来年化收益率"
+        DisplayTextOrDefault = CStr(value)
     End If
-End Sub
+End Function
 
-Private Sub FormatDirectSectionBlock(ByVal ws As Worksheet, ByVal headerRow As Long, ByVal lastRow As Long, ByVal sectionType As Long)
-    With ws.Range("B" & headerRow & ":F" & lastRow)
-        .RowHeight = 20
-        .Font.Name = FONT_NAME
-        .Font.Size = 14
-        .Font.Color = COLOR_WHITE
-        .HorizontalAlignment = xlCenter
-        .VerticalAlignment = xlCenter
-    End With
-    If lastRow >= headerRow Then
-        ws.Range("B" & headerRow & ":B" & lastRow).HorizontalAlignment = xlLeft
-    End If
-
-    With ws.Range("B" & headerRow & ":F" & lastRow).Borders
-        .LineStyle = xlContinuous
-        .Color = COLOR_WHITE
-        .Weight = xlThin
-    End With
-
-    With ws.Range("B" & headerRow & ":F" & headerRow)
-        .Interior.Color = COLOR_DARK_RED
-        .Font.Bold = True
-        .Font.Color = COLOR_GOLD
-    End With
-
-    If sectionType = 3 Then
-        With ws.Range("D" & headerRow & ":E" & headerRow)
-            .HorizontalAlignment = xlCenter
-            .VerticalAlignment = xlCenter
-        End With
-    End If
-End Sub
-
-Private Sub SortDirectSectionRows(ByVal ws As Worksheet, ByVal firstDataRow As Long, ByVal lastDataRow As Long)
-    If lastDataRow < firstDataRow Then Exit Sub
-
-    With ws.Sort
-        .SortFields.Clear
-        .SortFields.Add Key:=ws.Range("G" & firstDataRow & ":G" & lastDataRow), SortOn:=xlSortOnValues, Order:=xlAscending, DataOption:=xlSortNormal
-        .SortFields.Add Key:=ws.Range("A" & firstDataRow & ":A" & lastDataRow), SortOn:=xlSortOnValues, Order:=xlAscending, DataOption:=xlSortNormal
-        .SetRange ws.Range("A" & firstDataRow & ":G" & lastDataRow)
-        .Header = xlNo
-        .MatchCase = False
-        .Orientation = xlTopToBottom
-        .Apply
-    End With
-End Sub
-
-Private Sub ApplyDirectSectionFrequencyFillAndMerge(ByVal ws As Worksheet, ByVal firstDataRow As Long, ByVal lastDataRow As Long, ByVal sectionType As Long)
-    Dim groupStart As Long
-    Dim groupEnd As Long
-    Dim frequencyText As String
-    Dim groupIndex As Long
-    Dim fillColor As Long
-    Dim oldDisplayAlerts As Boolean
-
-    If lastDataRow < firstDataRow Then Exit Sub
-
-    groupStart = firstDataRow
-    groupIndex = 0
-
-    Do While groupStart <= lastDataRow
-        frequencyText = NormalizeText(ws.Cells(groupStart, 4).Value)
-        groupEnd = groupStart
-
-        Do While groupEnd + 1 <= lastDataRow And NormalizeText(ws.Cells(groupEnd + 1, 4).Value) = frequencyText
-            groupEnd = groupEnd + 1
-        Loop
-
-        If groupIndex Mod 2 = 0 Then
-            fillColor = COLOR_DARK_RED
-        Else
-            fillColor = COLOR_DARK_RED_ALT
-        End If
-
-        ws.Range("B" & groupStart & ":F" & groupEnd).Interior.Color = fillColor
-
-        oldDisplayAlerts = Application.DisplayAlerts
-        Application.DisplayAlerts = False
-        If sectionType = 3 Then
-            ws.Range("D" & groupStart & ":E" & groupEnd).Merge
-        ElseIf groupEnd > groupStart Then
-            ws.Range("D" & groupStart & ":D" & groupEnd).Merge
-        End If
-        Application.DisplayAlerts = oldDisplayAlerts
-
-        With ws.Range("D" & groupStart & ":D" & groupEnd)
-            .HorizontalAlignment = xlCenter
-            .VerticalAlignment = xlCenter
-        End With
-
-        If sectionType = 3 Then
-            With ws.Range("D" & groupStart & ":E" & groupEnd)
-                .HorizontalAlignment = xlCenter
-                .VerticalAlignment = xlCenter
-            End With
-        End If
-
-        groupStart = groupEnd + 1
-        groupIndex = groupIndex + 1
-    Loop
-End Sub
-
-Private Function IsDirectSeriesMatch(ByVal seriesValue As Variant, ByVal seriesKeyword As String, ByVal sectionType As Long) As Boolean
-    Dim seriesText As String
-    seriesText = NormalizeText(seriesValue)
-
-    If Len(seriesText) = 0 Then Exit Function
-
-    If sectionType = 1 Then
-        IsDirectSeriesMatch = (InStr(1, seriesText, "稳健", vbTextCompare) > 0)
-    ElseIf sectionType = 2 Then
-        IsDirectSeriesMatch = (InStr(1, seriesText, "汇益", vbTextCompare) > 0 And InStr(1, seriesText, "稳健", vbTextCompare) = 0)
+Private Function RowValue(ByVal row As Object, ByVal fieldName As String) As Variant
+    If row.Exists(fieldName) Then
+        RowValue = row(fieldName)
     Else
-        IsDirectSeriesMatch = (InStr(1, seriesText, "交鑫致远", vbTextCompare) > 0)
+        RowValue = Empty
     End If
 End Function
 
-Private Sub WriteOpenDateCell(ByVal targetCell As Range, ByVal dateValue As Variant)
-    Dim parsedDate As Date
+Private Function RowText(ByVal row As Object, ByVal fieldName As String) As String
+    RowText = NormalizeText(RowValue(row, fieldName))
+End Function
 
-    If TryReadDate(dateValue, parsedDate) Then
-        targetCell.Value = parsedDate
-        targetCell.NumberFormat = "yyyy-mm-dd"
+Private Function NumericSortValue(ByVal value As Variant) As Double
+    If IsError(value) Or IsEmpty(value) Or IsNull(value) Then
+        NumericSortValue = 1E+30
+    ElseIf Not IsNumeric(value) Then
+        NumericSortValue = 1E+30
     Else
-        targetCell.Value = "\"
-    End If
-End Sub
-
-Private Sub WriteNextOpenDateCell(ByVal targetCell As Range, ByVal sourceDateValue As Variant, _
-                                  ByVal intervalValue As Variant, ByVal baselineDate As Date)
-    If IsWeeklyInterval(intervalValue) Then
-        targetCell.Value = GetNextWednesday(baselineDate)
-        targetCell.NumberFormat = "yyyy-mm-dd"
-    Else
-        WriteOpenDateCell targetCell, sourceDateValue
-    End If
-End Sub
-
-Private Function IsWeeklyInterval(ByVal intervalValue As Variant) As Boolean
-    Dim intervalText As String
-    intervalText = NormalizeText(intervalValue)
-    IsWeeklyInterval = (intervalText = "7" Or intervalText = "7天" Or intervalText = "7日" Or _
-                        intervalText = "每周" Or intervalText = "周开" Or _
-                        InStr(1, intervalText, "周频", vbTextCompare) > 0)
-End Function
-
-Private Function GetNextWednesday(ByVal baselineDate As Date) As Date
-    Dim daysToAdd As Long
-    daysToAdd = 3 - Weekday(baselineDate, vbMonday)
-    If daysToAdd <= 0 Then daysToAdd = daysToAdd + 7
-    GetNextWednesday = DateAdd("d", daysToAdd, DateValue(baselineDate))
-End Function
-
-Private Sub WriteBankAgentReport(ByVal wsSource As Worksheet, ByVal wsTarget As Worksheet, ByVal baselineDate As Date)
-    Dim currentRow As Long
-    Dim noteRow As Long
-    Dim riskRow As Long
-    Dim fillEndRow As Long
-
-    wsTarget.Cells.ClearFormats
-    wsTarget.Cells.Font.Name = FONT_NAME
-
-    With wsTarget.Range("B3:F3")
-        .Merge
-        .Value = "热销产品"
-        .HorizontalAlignment = xlCenter
-        .VerticalAlignment = xlCenter
-        .Font.Bold = True
-        .Font.Size = 24
-        .Font.Color = COLOR_GOLD
-    End With
-
-    currentRow = 7
-    currentRow = WriteBankSection(wsSource, wsTarget, currentRow, "汇益稳健系列业绩", "稳健", 1, baselineDate)
-    currentRow = WriteBankSection(wsSource, wsTarget, currentRow, "汇益系列业绩", "汇益", 2, baselineDate)
-    currentRow = WriteBankSection(wsSource, wsTarget, currentRow, "汇益稳享系列业绩", "稳享", 3, baselineDate)
-    currentRow = WriteBankSection(wsSource, wsTarget, currentRow, "蓝色港湾系列业绩", "蓝色港湾", 4, baselineDate)
-
-    noteRow = currentRow
-    riskRow = noteRow + 1
-    fillEndRow = riskRow + 1
-
-    wsTarget.Range("A3:A" & fillEndRow).Interior.Color = COLOR_DARK_RED
-    wsTarget.Range("G3:G" & fillEndRow).Interior.Color = COLOR_DARK_RED
-    wsTarget.Range("B3:F6").Interior.Color = COLOR_DARK_RED
-    wsTarget.Range("B" & fillEndRow & ":F" & fillEndRow).Interior.Color = COLOR_DARK_RED
-
-    With wsTarget.Range("B" & noteRow & ":F" & noteRow)
-        .Merge
-        .Value = "*表中数据来源于托管人复核的产品净值数据，数据截至" & Format$(baselineDate, "yyyy-mm-dd") & "，仅供参考，产品有风险，投资需谨慎"
-        .Interior.Color = COLOR_DARK_RED_ALT
-        .HorizontalAlignment = xlCenter
-        .VerticalAlignment = xlCenter
-        .Font.Size = 12
-        .Font.Color = COLOR_GOLD
-    End With
-    ApplyWhiteBorder wsTarget.Range("B" & noteRow & ":F" & noteRow)
-
-    With wsTarget.Range("B" & riskRow & ":F" & riskRow)
-        .Merge
-        .Value = "风险提示:本产品由交银国际信托有限公司发行与管理，交通银行股份有限公司作为代销机构不承担产品的投资、兑付责任；" & vbLf & _
-                 "*请您认真阅读信托合同、产品说明书、风险申明书等法律文件，根据风险承受能力选择合适的产品；" & vbLf & _
-                 "*信托计划不承诺保证本金不受损失或最低收益，过往业绩并不预示其未来表现，产品发行人管理的其他产品的业绩并不构成未来产品业绩表现的保证；" & vbLf & _
-                 "*下表中信托产品的代销机构风险评级为3R-平衡型，该类产品的风险中等，所投资金存在一定亏损风险，收益或利益浮动且有一定波动。"
-        .Interior.Color = COLOR_DARK_RED
-        .HorizontalAlignment = xlLeft
-        .VerticalAlignment = xlCenter
-        .WrapText = True
-        .Font.Size = 10
-        .Font.Color = COLOR_GOLD
-    End With
-    wsTarget.Rows(riskRow).AutoFit
-    If wsTarget.Rows(riskRow).RowHeight < 70 Then wsTarget.Rows(riskRow).RowHeight = 70
-
-    wsTarget.Columns("A").ColumnWidth = 3
-    wsTarget.Columns("G").ColumnWidth = 3
-    wsTarget.Columns("B:F").AutoFit
-End Sub
-
-Private Function WriteBankSection(ByVal wsSource As Worksheet, ByVal wsTarget As Worksheet, _
-                                  ByVal titleRow As Long, ByVal titleText As String, _
-                                  ByVal seriesKeyword As String, ByVal sectionType As Long, _
-                                  ByVal baselineDate As Date) As Long
-    Dim headerRow As Long
-    Dim firstDataRow As Long
-    Dim lastDataRow As Long
-    Dim nextRow As Long
-    Dim sourceRow As Long
-    Dim lastSourceRow As Long
-    Dim intervalValue As Variant
-
-    With wsTarget.Range("B" & titleRow & ":F" & titleRow)
-        .Merge
-        .Value = titleText
-        .HorizontalAlignment = xlCenter
-        .VerticalAlignment = xlCenter
-        .Font.Bold = True
-        .Font.Size = 24
-        .Font.Color = COLOR_GOLD
-        .Interior.Color = COLOR_DARK_RED
-    End With
-
-    headerRow = titleRow + 1
-    firstDataRow = headerRow + 1
-    nextRow = firstDataRow
-
-    WriteBankSectionHeaders wsTarget, headerRow, sectionType
-
-    lastSourceRow = LastUsedRow(wsSource)
-    For sourceRow = 2 To lastSourceRow
-        If IsBankSeriesMatch(wsSource.Cells(sourceRow, BANK_COL_SERIES).Value, sectionType) Then
-            intervalValue = wsSource.Cells(sourceRow, BANK_COL_THEORETICAL_INTERVAL).Value
-
-            wsTarget.Cells(nextRow, 1).Value = BuildSortKey(wsSource.Cells(sourceRow, BANK_COL_SEQ).Value)
-            wsTarget.Cells(nextRow, 2).Value = wsSource.Cells(sourceRow, BANK_COL_PRODUCT_NAME).Value
-            WriteNextOpenDateCell wsTarget.Cells(nextRow, 3), wsSource.Cells(sourceRow, BANK_COL_NEXT_OPEN).Value, intervalValue, baselineDate
-            wsTarget.Cells(nextRow, 7).Value = BuildSortKey(intervalValue)
-
-            If sectionType = 1 Then
-                wsTarget.Cells(nextRow, 4).Value = FormatOpenFrequency(intervalValue)
-                wsTarget.Cells(nextRow, 5).Value = wsSource.Cells(sourceRow, BANK_COL_7DAY_ANNUAL).Value
-                wsTarget.Cells(nextRow, 6).Value = wsSource.Cells(sourceRow, BANK_COL_28DAY_ANNUAL).Value
-                wsTarget.Range("E" & nextRow & ":F" & nextRow).NumberFormat = "0.00%"
-            ElseIf sectionType = 2 Then
-                wsTarget.Cells(nextRow, 4).Value = FormatOpenFrequency(intervalValue)
-                WriteValueOrSlash wsTarget.Cells(nextRow, 5), wsSource.Cells(sourceRow, BANK_COL_BENCHMARK_RATE).Value
-                wsTarget.Cells(nextRow, 6).Value = wsSource.Cells(sourceRow, BANK_COL_28DAY_ANNUAL).Value
-                wsTarget.Range("E" & nextRow & ":F" & nextRow).NumberFormat = "0.00%"
-            ElseIf sectionType = 3 Then
-                WriteValueOrSlash wsTarget.Cells(nextRow, 4), wsSource.Cells(sourceRow, BANK_COL_PREV_PERIOD_ANNUAL).Value
-                wsTarget.Cells(nextRow, 5).Value = wsSource.Cells(sourceRow, BANK_COL_ELAPSED).Value
-                wsTarget.Cells(nextRow, 6).Value = wsSource.Cells(sourceRow, BANK_COL_CURRENT_PERIOD_ANNUAL).Value
-                wsTarget.Range("D" & nextRow).NumberFormat = "0.00%"
-                wsTarget.Range("F" & nextRow).NumberFormat = "0.00%"
-            Else
-                wsTarget.Cells(nextRow, 4).Value = FormatOpenFrequency(intervalValue)
-                wsTarget.Cells(nextRow, 5).Value = wsSource.Cells(sourceRow, BANK_COL_ELAPSED).Value
-                wsTarget.Cells(nextRow, 6).Value = wsSource.Cells(sourceRow, BANK_COL_CURRENT_PERIOD_ANNUAL).Value
-                wsTarget.Range("F" & nextRow).NumberFormat = "0.00%"
-            End If
-
-            nextRow = nextRow + 1
-        End If
-    Next sourceRow
-
-    lastDataRow = nextRow - 1
-    If lastDataRow >= firstDataRow Then
-        SortBankSectionRows wsTarget, firstDataRow, lastDataRow
-        ApplyBankSectionFrequencyFill wsTarget, firstDataRow, lastDataRow, sectionType
-        wsTarget.Range("A" & firstDataRow & ":A" & lastDataRow).ClearContents
-        wsTarget.Range("G" & firstDataRow & ":G" & lastDataRow).ClearContents
-    End If
-
-    FormatBankSectionBlock wsTarget, headerRow, IIf(lastDataRow >= firstDataRow, lastDataRow, headerRow)
-    WriteBankSection = IIf(lastDataRow >= firstDataRow, lastDataRow + 1, headerRow + 1)
-End Function
-
-Private Sub WriteBankSectionHeaders(ByVal ws As Worksheet, ByVal headerRow As Long, ByVal sectionType As Long)
-    If sectionType = 1 Then
-        ws.Range("B" & headerRow).Value = "净值型产品名称"
-        ws.Range("C" & headerRow).Value = "下一开放日"
-        ws.Range("D" & headerRow).Value = "开放频率"
-        ws.Range("E" & headerRow).Value = "7日年化收益率"
-        ws.Range("F" & headerRow).Value = "28日年化收益率"
-    ElseIf sectionType = 2 Then
-        ws.Range("B" & headerRow).Value = "报价型产品名称"
-        ws.Range("C" & headerRow).Value = "下一开放日"
-        ws.Range("D" & headerRow).Value = "开放频率"
-        ws.Range("E" & headerRow).Value = "基准"
-        ws.Range("F" & headerRow).Value = "28日年化收益率"
-    ElseIf sectionType = 3 Then
-        ws.Range("B" & headerRow).Value = "长期限产品名称"
-        ws.Range("C" & headerRow).Value = "下一开放日"
-        ws.Range("D" & headerRow).Value = "上期年化收益率"
-        ws.Range("E" & headerRow).Value = "当前周期运作天数"
-        ws.Range("F" & headerRow).Value = "当期年化收益率"
-    Else
-        ws.Range("B" & headerRow).Value = "产品名称"
-        ws.Range("C" & headerRow).Value = "下一开放日"
-        ws.Range("D" & headerRow).Value = "开放频率"
-        ws.Range("E" & headerRow).Value = "当前周期运作天数"
-        ws.Range("F" & headerRow).Value = "当期年化收益率"
-    End If
-End Sub
-
-Private Sub FormatBankSectionBlock(ByVal ws As Worksheet, ByVal headerRow As Long, ByVal lastRow As Long)
-    With ws.Range("B" & headerRow & ":F" & lastRow)
-        .RowHeight = 20
-        .Font.Name = FONT_NAME
-        .Font.Size = 14
-        .Font.Color = COLOR_WHITE
-        .HorizontalAlignment = xlCenter
-        .VerticalAlignment = xlCenter
-    End With
-    If lastRow >= headerRow Then
-        ws.Range("B" & headerRow & ":B" & lastRow).HorizontalAlignment = xlLeft
-    End If
-
-    With ws.Range("B" & headerRow & ":F" & lastRow).Borders
-        .LineStyle = xlContinuous
-        .Color = COLOR_WHITE
-        .Weight = xlThin
-    End With
-
-    With ws.Range("B" & headerRow & ":F" & headerRow)
-        .Interior.Color = COLOR_DARK_RED
-        .Font.Bold = True
-        .Font.Color = COLOR_GOLD
-    End With
-End Sub
-
-Private Sub SortBankSectionRows(ByVal ws As Worksheet, ByVal firstDataRow As Long, ByVal lastDataRow As Long)
-    If lastDataRow < firstDataRow Then Exit Sub
-
-    With ws.Sort
-        .SortFields.Clear
-        .SortFields.Add Key:=ws.Range("G" & firstDataRow & ":G" & lastDataRow), SortOn:=xlSortOnValues, Order:=xlAscending, DataOption:=xlSortNormal
-        .SortFields.Add Key:=ws.Range("A" & firstDataRow & ":A" & lastDataRow), SortOn:=xlSortOnValues, Order:=xlAscending, DataOption:=xlSortNormal
-        .SetRange ws.Range("A" & firstDataRow & ":G" & lastDataRow)
-        .Header = xlNo
-        .MatchCase = False
-        .Orientation = xlTopToBottom
-        .Apply
-    End With
-End Sub
-
-Private Sub ApplyBankSectionFrequencyFill(ByVal ws As Worksheet, ByVal firstDataRow As Long, ByVal lastDataRow As Long, ByVal sectionType As Long)
-    Dim groupStart As Long
-    Dim groupEnd As Long
-    Dim frequencyText As String
-    Dim groupIndex As Long
-    Dim fillColor As Long
-    Dim oldDisplayAlerts As Boolean
-
-    If lastDataRow < firstDataRow Then Exit Sub
-
-    groupStart = firstDataRow
-    groupIndex = 0
-
-    Do While groupStart <= lastDataRow
-        frequencyText = NormalizeText(ws.Cells(groupStart, 7).Value)
-        groupEnd = groupStart
-
-        Do While groupEnd + 1 <= lastDataRow And NormalizeText(ws.Cells(groupEnd + 1, 7).Value) = frequencyText
-            groupEnd = groupEnd + 1
-        Loop
-
-        If groupIndex Mod 2 = 0 Then
-            fillColor = COLOR_DARK_RED
-        Else
-            fillColor = COLOR_DARK_RED_ALT
-        End If
-
-        ws.Range("B" & groupStart & ":F" & groupEnd).Interior.Color = fillColor
-
-        If (sectionType <= 2 Or sectionType = 4) And groupEnd > groupStart Then
-            oldDisplayAlerts = Application.DisplayAlerts
-            Application.DisplayAlerts = False
-            ws.Range("D" & groupStart & ":D" & groupEnd).Merge
-            Application.DisplayAlerts = oldDisplayAlerts
-        End If
-
-        If sectionType <= 2 Or sectionType = 4 Then
-            With ws.Range("D" & groupStart & ":D" & groupEnd)
-                .HorizontalAlignment = xlCenter
-                .VerticalAlignment = xlCenter
-            End With
-        End If
-
-        groupStart = groupEnd + 1
-        groupIndex = groupIndex + 1
-    Loop
-End Sub
-
-Private Function IsBankSeriesMatch(ByVal seriesValue As Variant, ByVal sectionType As Long) As Boolean
-    Dim seriesText As String
-    seriesText = NormalizeText(seriesValue)
-    If Len(seriesText) = 0 Then Exit Function
-
-    If sectionType = 1 Then
-        IsBankSeriesMatch = (InStr(1, seriesText, "稳健", vbTextCompare) > 0)
-    ElseIf sectionType = 2 Then
-        IsBankSeriesMatch = (InStr(1, seriesText, "汇益", vbTextCompare) > 0 _
-                             And InStr(1, seriesText, "稳健", vbTextCompare) = 0 _
-                             And InStr(1, seriesText, "稳享", vbTextCompare) = 0)
-    ElseIf sectionType = 3 Then
-        IsBankSeriesMatch = (InStr(1, seriesText, "稳享", vbTextCompare) > 0)
-    Else
-        IsBankSeriesMatch = (InStr(1, seriesText, "蓝色港湾", vbTextCompare) > 0)
+        NumericSortValue = CDbl(value)
     End If
 End Function
 
-Private Sub WriteValueOrSlash(ByVal targetCell As Range, ByVal sourceValue As Variant)
-    If IsError(sourceValue) Or IsEmpty(sourceValue) Or Len(NormalizeText(sourceValue)) = 0 Then
-        targetCell.Value = "\"
-    Else
-        targetCell.Value = sourceValue
-    End If
-End Sub
-
-Private Sub ApplyFrequencyGroupFillAndMerge(ByVal ws As Worksheet, ByVal firstDataRow As Long, ByVal lastDataRow As Long)
-    Dim groupStart As Long
-    Dim groupEnd As Long
-    Dim frequencyText As String
-    Dim groupIndex As Long
-    Dim fillColor As Long
-    Dim oldDisplayAlerts As Boolean
-
-    If lastDataRow < firstDataRow Then Exit Sub
-
-    groupStart = firstDataRow
-    groupIndex = 0
-
-    Do While groupStart <= lastDataRow
-        frequencyText = NormalizeText(ws.Cells(groupStart, 4).Value)
-        groupEnd = groupStart
-
-        Do While groupEnd + 1 <= lastDataRow And NormalizeText(ws.Cells(groupEnd + 1, 4).Value) = frequencyText
-            groupEnd = groupEnd + 1
-        Loop
-
-        If groupIndex Mod 2 = 0 Then
-            fillColor = COLOR_DARK_RED
-        Else
-            fillColor = COLOR_DARK_RED_ALT
-        End If
-
-        ws.Range("B" & groupStart & ":F" & groupEnd).Interior.Color = fillColor
-
-        If groupEnd > groupStart Then
-            oldDisplayAlerts = Application.DisplayAlerts
-            Application.DisplayAlerts = False
-            ws.Range("D" & groupStart & ":D" & groupEnd).Merge
-            Application.DisplayAlerts = oldDisplayAlerts
-        End If
-
-        With ws.Range("D" & groupStart & ":D" & groupEnd)
-            .HorizontalAlignment = xlCenter
-            .VerticalAlignment = xlCenter
-        End With
-
-        groupStart = groupEnd + 1
-        groupIndex = groupIndex + 1
-    Loop
-End Sub
-
-Private Sub WriteYuanRongAnXiangReport(ByVal wsSource As Worksheet, ByVal wsTarget As Worksheet, ByVal baselineDate As Date)
-    Dim currentRow As Long
-    Dim noteRow As Long
-    Dim riskRow As Long
-
-    wsTarget.Cells.ClearFormats
-    wsTarget.Cells.ClearContents
-    wsTarget.Cells.Font.Name = FONT_NAME_YUANRONG
-
-    With wsTarget.Range("A1:E1")
-        .Merge
-        .Value = "交银国信·圆融安享汇益固收稳健系列信托计划" & vbLf & "历史到期产品收益情况"
-        .Interior.Color = COLOR_YUANRONG_TITLE
-        .HorizontalAlignment = xlCenter
-        .VerticalAlignment = xlCenter
-        .WrapText = True
-        .Font.Name = FONT_NAME_YUANRONG
-        .Font.Bold = True
-        .Font.Size = 20
-        .Font.Color = COLOR_WHITE
-    End With
-    wsTarget.Rows(1).RowHeight = 56
-
-    wsTarget.Range("A2:E2").Interior.Color = COLOR_WHITE
-    wsTarget.Rows(2).RowHeight = 80
-
-    currentRow = 3
-    currentRow = WriteYuanRongAnXiangSection(wsSource, wsTarget, currentRow, "日开", baselineDate)
-
-    wsTarget.Range("A13:E13").Interior.Color = COLOR_WHITE
-    wsTarget.Rows(13).RowHeight = 80
-
-    currentRow = 14
-    currentRow = WriteYuanRongAnXiangSection(wsSource, wsTarget, currentRow, "周开", baselineDate)
-
-    wsTarget.Range("A18:E18").Interior.Color = COLOR_WHITE
-    wsTarget.Rows(18).RowHeight = 80
-
-    currentRow = 19
-    currentRow = WriteYuanRongAnXiangSection(wsSource, wsTarget, currentRow, "月开", baselineDate)
-
-    noteRow = currentRow
-    riskRow = noteRow + 1
-
-    With wsTarget.Range("A" & noteRow & ":E" & noteRow)
-        .Merge
-        .Value = "*表中数据来源于托管人复核的产品净值数据，数据截至" & Format$(baselineDate, "yyyy-mm-dd") & "，仅供参考，产品有风险，投资需谨慎"
-        ApplyYuanRongTitleFormat wsTarget.Range("A" & noteRow & ":E" & noteRow), 12, False
-        .HorizontalAlignment = xlCenter
-        .VerticalAlignment = xlCenter
-    End With
-
-    With wsTarget.Range("A" & riskRow & ":E" & riskRow)
-        .Merge
-        .Value = "风险提示:本产品由交银国际信托有限公司发行与管理，交通银行股份有限公司作为代销机构不承担产品的投资、兑付责任；" & vbLf & _
-                 "*请您认真阅读信托合同、产品说明书、风险申明书等法律文件，根据风险承受能力选择合适的产品；" & vbLf & _
-                 "*信托计划不承诺保证本金不受损失或最低收益，过往业绩并不预示其未来表现，产品发行人管理的其他产品的业绩并不构成未来产品业绩表现的保证；" & vbLf & _
-                 "*下表中信托产品的代销机构风险评级为3R-平衡型，该类产品的风险中等，所投资金存在一定亏损风险，收益或利益浮动且有一定波动。"
-        ApplyYuanRongTitleFormat wsTarget.Range("A" & riskRow & ":E" & riskRow), 9, False
-        .HorizontalAlignment = xlLeft
-        .VerticalAlignment = xlCenter
-        .WrapText = True
-    End With
-    wsTarget.Rows(riskRow).AutoFit
-    If wsTarget.Rows(riskRow).RowHeight < 70 Then wsTarget.Rows(riskRow).RowHeight = 70
-
-    ApplyWhiteBorder wsTarget.Range("A1:E" & riskRow)
-    wsTarget.Columns("A").ColumnWidth = 50
-    wsTarget.Columns("B").ColumnWidth = 14
-    wsTarget.Columns("C").ColumnWidth = 14
-    wsTarget.Columns("D").ColumnWidth = 16
-    wsTarget.Columns("E").ColumnWidth = 20
-    wsTarget.Columns("F").Hidden = True
-    AddYuanRongLogoIfExists wsTarget
-End Sub
-
-Private Function WriteYuanRongAnXiangSection(ByVal wsSource As Worksheet, ByVal wsTarget As Worksheet, _
-                                             ByVal headerRow As Long, ByVal seriesName As String, _
-                                             ByVal baselineDate As Date) As Long
-    Dim firstDataRow As Long
-    Dim lastDataRow As Long
-    Dim nextRow As Long
-    Dim sourceRow As Long
-    Dim lastSourceRow As Long
-    Dim intervalValue As Variant
-
-    WriteYuanRongAnXiangHeaders wsTarget, headerRow
-
-    firstDataRow = headerRow + 1
-    nextRow = firstDataRow
-
-    lastSourceRow = LastUsedRow(wsSource)
-    For sourceRow = 2 To lastSourceRow
-        If StrComp(NormalizeText(wsSource.Cells(sourceRow, YRA_COL_SERIES).Value), seriesName, vbTextCompare) = 0 Then
-            intervalValue = wsSource.Cells(sourceRow, YRA_COL_THEORETICAL_INTERVAL).Value
-
-            wsTarget.Cells(nextRow, 1).Value = wsSource.Cells(sourceRow, YRA_COL_PRODUCT_NAME).Value
-            WriteNextOpenDateCell wsTarget.Cells(nextRow, 2), wsSource.Cells(sourceRow, YRA_COL_NEXT_OPEN).Value, intervalValue, baselineDate
-            wsTarget.Cells(nextRow, 3).Value = FormatOpenFrequency(intervalValue)
-            wsTarget.Cells(nextRow, 4).Value = wsSource.Cells(sourceRow, YRA_COL_7DAY_ANNUAL).Value
-            wsTarget.Cells(nextRow, 5).Value = wsSource.Cells(sourceRow, YRA_COL_28DAY_ANNUAL).Value
-            wsTarget.Cells(nextRow, 6).Value = BuildSortKey(wsSource.Cells(sourceRow, YRA_COL_SEQ).Value)
-            wsTarget.Range("D" & nextRow & ":E" & nextRow).NumberFormat = "0.00%"
-            nextRow = nextRow + 1
-        End If
-    Next sourceRow
-
-    lastDataRow = nextRow - 1
-    If lastDataRow >= firstDataRow Then
-        SortYuanRongAnXiangRows wsTarget, firstDataRow, lastDataRow
-        wsTarget.Range("F" & firstDataRow & ":F" & lastDataRow).ClearContents
-        ApplyYuanRongRecordFormat wsTarget.Range("A" & firstDataRow & ":E" & lastDataRow)
-        ApplyYuanRongFrequencyMerge wsTarget, firstDataRow, lastDataRow
-    End If
-
-    FormatYuanRongSectionBlock wsTarget, headerRow, IIf(lastDataRow >= firstDataRow, lastDataRow, headerRow)
-    WriteYuanRongAnXiangSection = IIf(lastDataRow >= firstDataRow, lastDataRow + 1, headerRow + 1)
+Private Function IsEnabledValue(ByVal value As Variant) As Boolean
+    Dim textValue As String
+    textValue = UCase$(NormalizeText(value))
+    IsEnabledValue = (textValue = "是" Or textValue = "Y" Or textValue = "YES" Or _
+                      textValue = "1" Or textValue = "TRUE" Or textValue = "启用")
 End Function
 
-Private Sub WriteYuanRongAnXiangHeaders(ByVal ws As Worksheet, ByVal headerRow As Long)
-    ws.Range("A" & headerRow).Value = "产品名称"
-    ws.Range("B" & headerRow).Value = "下一开放日"
-    ws.Range("C" & headerRow).Value = "开放频率"
-    ws.Range("D" & headerRow).Value = "7日年化收益率"
-    ws.Range("E" & headerRow).Value = "28日年化收益率"
-End Sub
-
-Private Sub FormatYuanRongSectionBlock(ByVal ws As Worksheet, ByVal headerRow As Long, ByVal lastRow As Long)
-    ApplyYuanRongTitleFormat ws.Range("A" & headerRow & ":E" & headerRow), 14, True
-
-    With ws.Range("A" & headerRow & ":E" & lastRow)
-        .RowHeight = 22
-        .Font.Name = FONT_NAME_YUANRONG
-        .HorizontalAlignment = xlCenter
-        .VerticalAlignment = xlCenter
-        .WrapText = True
-    End With
-    If lastRow > headerRow Then
-        ws.Range("A" & (headerRow + 1) & ":A" & lastRow).HorizontalAlignment = xlLeft
-    End If
-    ApplyWhiteBorder ws.Range("A" & headerRow & ":E" & lastRow)
-End Sub
-
-Private Sub ApplyYuanRongTitleFormat(ByVal targetRange As Range, ByVal fontSize As Long, ByVal boldText As Boolean)
-    With targetRange
-        .Interior.Color = COLOR_YUANRONG_TITLE
-        .Font.Name = FONT_NAME_YUANRONG
-        .Font.Size = fontSize
-        .Font.Bold = boldText
-        .Font.Color = COLOR_WHITE
-    End With
-End Sub
-
-Private Sub ApplyYuanRongRecordFormat(ByVal targetRange As Range)
-    With targetRange
-        .Interior.Color = COLOR_YUANRONG_RECORD
-        .Font.Name = FONT_NAME_YUANRONG
-        .Font.Size = 14
-        .Font.Bold = False
-        .Font.Color = COLOR_BLACK
-        .HorizontalAlignment = xlCenter
-        .VerticalAlignment = xlCenter
-    End With
-    targetRange.Columns(1).HorizontalAlignment = xlLeft
-    ApplyWhiteBorder targetRange
-End Sub
-
-Private Sub ApplyYuanRongFrequencyMerge(ByVal ws As Worksheet, ByVal firstDataRow As Long, ByVal lastDataRow As Long)
-    Dim groupStart As Long
-    Dim groupEnd As Long
-    Dim frequencyText As String
-    Dim oldDisplayAlerts As Boolean
-
-    If lastDataRow < firstDataRow Then Exit Sub
-
-    groupStart = firstDataRow
-    Do While groupStart <= lastDataRow
-        frequencyText = NormalizeText(ws.Cells(groupStart, 3).Value)
-        groupEnd = groupStart
-
-        Do While groupEnd + 1 <= lastDataRow And NormalizeText(ws.Cells(groupEnd + 1, 3).Value) = frequencyText
-            groupEnd = groupEnd + 1
-        Loop
-
-        If groupEnd > groupStart Then
-            oldDisplayAlerts = Application.DisplayAlerts
-            Application.DisplayAlerts = False
-            ws.Range("C" & groupStart & ":C" & groupEnd).Merge
-            Application.DisplayAlerts = oldDisplayAlerts
-        End If
-
-        With ws.Range("C" & groupStart & ":C" & groupEnd)
-            .HorizontalAlignment = xlCenter
-            .VerticalAlignment = xlCenter
-        End With
-
-        groupStart = groupEnd + 1
-    Loop
-End Sub
-
-Private Sub AddYuanRongLogoIfExists(ByVal ws As Worksheet)
-    Dim logoPath As String
-    logoPath = AssetImagePath("logo.png")
-    If Dir(logoPath) = vbNullString Then Exit Sub
-
-    Dim targetCell As Range
-    Set targetCell = ws.Range("E1")
-
-    DeletePicturesInRange ws, targetCell
-
-    Dim shp As Shape
-    Set shp = ws.Shapes.AddPicture( _
-        FileName:=logoPath, _
-        LinkToFile:=msoFalse, _
-        SaveWithDocument:=msoTrue, _
-        Left:=targetCell.Left, _
-        Top:=targetCell.Top, _
-        Width:=-1, _
-        Height:=-1)
-
-    shp.Name = "圆融安享Logo"
-    shp.LockAspectRatio = msoTrue
-    shp.Width = targetCell.Width
-    shp.Left = targetCell.Left + targetCell.Width - shp.Width
-    shp.Top = targetCell.Top
-    shp.Placement = xlMove
-End Sub
-
-Private Sub SortYuanRongAnXiangRows(ByVal ws As Worksheet, ByVal firstDataRow As Long, ByVal lastDataRow As Long)
-    If lastDataRow < firstDataRow Then Exit Sub
-
-    With ws.Sort
-        .SortFields.Clear
-        .SortFields.Add Key:=ws.Range("F" & firstDataRow & ":F" & lastDataRow), SortOn:=xlSortOnValues, Order:=xlAscending, DataOption:=xlSortNormal
-        .SetRange ws.Range("A" & firstDataRow & ":F" & lastDataRow)
-        .Header = xlNo
-        .MatchCase = False
-        .Orientation = xlTopToBottom
-        .Apply
-    End With
-End Sub
-
-Private Sub AddTitleImageIfExists(ByVal ws As Worksheet)
-    Dim imagePath As String
-    imagePath = AssetImagePath(TITLE_IMAGE_NAME)
-    If Dir(imagePath) = vbNullString Then Exit Sub
-
-    Dim targetRange As Range
-    Set targetRange = ws.Range("A1:G2")
-
-    Dim shp As Shape
-    Set shp = ws.Shapes.AddPicture( _
-        FileName:=imagePath, _
-        LinkToFile:=msoFalse, _
-        SaveWithDocument:=msoTrue, _
-        Left:=targetRange.Left, _
-        Top:=targetRange.Top, _
-        Width:=-1, _
-        Height:=-1)
-
-    shp.LockAspectRatio = msoTrue
-    shp.Width = targetRange.Width
-    shp.Placement = xlFreeFloating
-
-    Dim imageHeight As Double
-    imageHeight = shp.Height
-
-    ws.Rows(1).RowHeight = imageHeight / 2
-    ws.Rows(2).RowHeight = imageHeight / 2
-
-    Set targetRange = ws.Range("A1:G2")
-    shp.Left = targetRange.Left
-    shp.Top = targetRange.Top
-    shp.Placement = xlMove
-End Sub
-
-Private Function AssetImagePath(ByVal imageName As String) As String
-    AssetImagePath = ThisWorkbook.Path & Application.PathSeparator & _
-                     Replace(ASSET_IMAGE_FOLDER, "\", Application.PathSeparator) & _
-                     Application.PathSeparator & imageName
+Private Function CreateTextDictionary() As Object
+    Dim result As Object
+    Set result = CreateObject("Scripting.Dictionary")
+    result.CompareMode = vbTextCompare
+    Set CreateTextDictionary = result
 End Function
-
-Private Function InsertChartImagesIntoDisplay(ByVal wbOutput As Workbook, ByVal dbPath As String, ByVal baselineKey As String) As String
-    Dim imgKey As String
-    imgKey = FindLatestChartFolderKey(dbPath)
-
-    If Len(imgKey) = 0 Then
-        InsertChartImagesIntoDisplay = "【图表图片提醒】未找到 产品图表_yyyymmdd 文件夹，展示报表已保留图片空位。"
-        Exit Function
-    End If
-
-    Dim imgFolder As String
-    imgFolder = dbPath & "产品图表_" & imgKey & Application.PathSeparator
-
-    If Dir(imgFolder, vbDirectory) = vbNullString Then
-        InsertChartImagesIntoDisplay = "【图表图片提醒】未找到图片文件夹：" & imgFolder & "，展示报表已保留图片空位。"
-        Exit Function
-    End If
-
-    Dim missingImages As String
-    Dim insertedCount As Long
-
-    InsertChartImageGroup wbOutput.Worksheets(CAT_STABLE), imgFolder, _
-        Array("汇益稳享364天101号_红.png", _
-              "汇益稳享728天108号_红.png"), _
-        Array("B4:F4", _
-              "B5:F5"), _
-        insertedCount, missingImages
-
-    InsertChartImageGroup wbOutput.Worksheets(CAT_BANK), imgFolder, _
-        Array("汇益固收稳健7天2号_红.png", _
-              "汇益固收稳健28天6号_红.png", _
-              "汇益稳享91天3号_红.png"), _
-        Array("B4:F4", _
-              "B5:F5", _
-              "B6:F6"), _
-        insertedCount, missingImages
-
-    InsertChartImageGroup wbOutput.Worksheets(CAT_DIRECT), imgFolder, _
-        Array("汇益固收稳健日开101号_红.png", _
-              "汇益固收稳健28天101号_红.png", _
-              "交鑫致远6个月101号_红.png"), _
-        Array("B4:F4", _
-              "B5:F5", _
-              "B6:F6"), _
-        insertedCount, missingImages
-
-    InsertChartImageGroup wbOutput.Worksheets(CAT_YUANRONG_ANXIANG), imgFolder, _
-        Array("圆融安享汇益固收稳健日开8号_蓝.png", _
-              "圆融安享汇益固收稳健7天2号_蓝.png", _
-              "圆融安享汇益固收稳健28天1号_蓝.png"), _
-        Array("A2:E2", _
-              "A13:E13", _
-              "A18:E18"), _
-        insertedCount, missingImages
-
-    Dim notice As String
-    notice = "【图表图片提醒】使用图片日期：" & imgKey
-
-    If Len(baselineKey) > 0 And imgKey <> baselineKey Then
-        notice = notice & vbCrLf & "【重要】图片日期与展示报表基准日期不一致：图片日期 " & imgKey & "，基准日期 " & baselineKey & "。"
-    End If
-
-    notice = notice & vbCrLf & "已插入图表图片：" & insertedCount & " 张。"
-
-    If Len(missingImages) > 0 Then
-        notice = notice & vbCrLf & "以下图片未找到，相关空位已保留：" & vbCrLf & Left$(missingImages, Len(missingImages) - 2)
-    End If
-
-    InsertChartImagesIntoDisplay = notice
-End Function
-
-Private Sub InsertChartImageGroup(ByVal ws As Worksheet, ByVal imgFolder As String, ByVal imgNames As Variant, _
-                                  ByVal targetAddresses As Variant, ByRef insertedCount As Long, ByRef missingImages As String)
-    If UBound(imgNames) - LBound(imgNames) <> UBound(targetAddresses) - LBound(targetAddresses) Then
-        missingImages = missingImages & ws.Name & "(图片数量与目标区域数量不一致), "
-        Exit Sub
-    End If
-
-    Dim i As Long
-    For i = LBound(imgNames) To UBound(imgNames)
-        Dim imgPath As String
-        imgPath = imgFolder & CStr(imgNames(i))
-
-        Dim targetRng As Range
-        Set targetRng = ws.Range(CStr(targetAddresses(i)))
-        targetRng.Interior.Color = COLOR_WHITE
-
-        If Dir(imgPath) = vbNullString Then
-            missingImages = missingImages & ws.Name & "/" & CStr(imgNames(i)) & ", "
-        Else
-            DeletePicturesInRange ws, targetRng
-            InsertPictureFitWidthAndSetRowHeight ws, imgPath, targetRng, targetRng.Row
-            insertedCount = insertedCount + 1
-        End If
-    Next i
-End Sub
-
-Private Function FindLatestChartFolderKey(ByVal dbPath As String) As String
-    Dim regex As Object
-    Set regex = CreateObject("VBScript.RegExp")
-    regex.Pattern = "^产品图表_(\d{8})$"
-    regex.IgnoreCase = True
-
-    Dim folderName As String
-    folderName = Dir(dbPath & "产品图表_*", vbDirectory)
-
-    Dim latestKey As String
-    Dim matches As Object
-
-    Do While Len(folderName) > 0
-        If folderName <> "." And folderName <> ".." Then
-            If (GetAttr(dbPath & folderName) And vbDirectory) = vbDirectory Then
-                If regex.Test(folderName) Then
-                    Set matches = regex.Execute(folderName)
-                    If matches(0).SubMatches(0) > latestKey Then
-                        latestKey = matches(0).SubMatches(0)
-                    End If
-                End If
-            End If
-        End If
-        folderName = Dir()
-    Loop
-
-    FindLatestChartFolderKey = latestKey
-End Function
-
-Private Sub DeletePicturesInRange(ByVal ws As Worksheet, ByVal targetRng As Range)
-    Dim i As Long
-    Dim shp As Shape
-
-    For i = ws.Shapes.Count To 1 Step -1
-        Set shp = ws.Shapes(i)
-        If shp.Type = msoPicture Or shp.Type = msoLinkedPicture Then
-            If ShapeOverlapsRange(shp, targetRng) Then
-                shp.Delete
-            End If
-        End If
-    Next i
-End Sub
-
-Private Function ShapeOverlapsRange(ByVal shp As Shape, ByVal rng As Range) As Boolean
-    Dim shpLeft As Double, shpRight As Double
-    Dim shpTop As Double, shpBottom As Double
-    Dim rngLeft As Double, rngRight As Double
-    Dim rngTop As Double, rngBottom As Double
-
-    shpLeft = shp.Left
-    shpRight = shp.Left + shp.Width
-    shpTop = shp.Top
-    shpBottom = shp.Top + shp.Height
-
-    rngLeft = rng.Left
-    rngRight = rng.Left + rng.Width
-    rngTop = rng.Top
-    rngBottom = rng.Top + rng.Height
-
-    ShapeOverlapsRange = Not ( _
-        shpRight < rngLeft Or _
-        shpLeft > rngRight Or _
-        shpBottom < rngTop Or _
-        shpTop > rngBottom)
-End Function
-
-Private Sub InsertPictureFitWidthAndSetRowHeight(ByVal ws As Worksheet, ByVal imgPath As String, _
-                                                  ByVal targetRng As Range, ByVal rowNum As Long)
-    Dim shp As Shape
-    Set shp = ws.Shapes.AddPicture( _
-        FileName:=imgPath, _
-        LinkToFile:=msoFalse, _
-        SaveWithDocument:=msoTrue, _
-        Left:=targetRng.Left, _
-        Top:=targetRng.Top, _
-        Width:=-1, _
-        Height:=-1)
-
-    shp.Name = "展示图_" & CStr(rowNum)
-    shp.LockAspectRatio = msoTrue
-    shp.Width = targetRng.Width
-    shp.Placement = xlMove
-
-    Dim picW As Double
-    Dim picH As Double
-    picW = shp.Width
-    picH = shp.Height
-
-    Dim newRowHeight As Double
-    newRowHeight = picH + 2
-    If newRowHeight > 409.5 Then newRowHeight = 409.5
-    ws.Rows(rowNum).RowHeight = newRowHeight
-
-    shp.LockAspectRatio = msoTrue
-    shp.Left = targetRng.Left
-    shp.Top = targetRng.Top
-    shp.Width = picW
-    shp.Height = picH
-    shp.Placement = xlMove
-End Sub
 
 Private Function GetBaselineDateFromProductCategory() As Date
     Dim ws As Worksheet
-    Set ws = ThisWorkbook.Worksheets(PRODUCT_CATEGORY_SHEET_NAME)
-
-    Dim headerMap As Object
-    Set headerMap = BuildHeaderMap(ws, 1)
-    If headerMap Is Nothing Then Err.Raise vbObjectError + 4201, , "无法读取产品分类表头"
-    If Not headerMap.Exists(COL_BASELINE_DATE) Then Err.Raise vbObjectError + 4202, , "产品分类缺少字段：" & COL_BASELINE_DATE
-
-    Dim baselineCol As Long
-    baselineCol = CLng(headerMap(COL_BASELINE_DATE))
+    Set ws = ThisWorkbook.Worksheets(SHEET_PRODUCT_CATEGORY)
+    Dim headers As Object
+    Set headers = BuildHeaderMap(ws, 1)
+    If Not headers.Exists(COL_BASELINE_DATE) Then
+        Err.Raise vbObjectError + 4205, , SHEET_PRODUCT_CATEGORY & "缺少字段：" & COL_BASELINE_DATE
+    End If
 
     Dim lastRow As Long
-    Dim r As Long
-    Dim parsedDate As Date
     lastRow = LastUsedRow(ws)
-
+    Dim r As Long
     For r = 2 To lastRow
-        If TryReadDate(ws.Cells(r, baselineCol).Value, parsedDate) Then
+        Dim parsedDate As Date
+        If TryReadDate(ws.Cells(r, CLng(headers(COL_BASELINE_DATE))).Value, parsedDate) Then
             GetBaselineDateFromProductCategory = parsedDate
             Exit Function
         End If
     Next r
-
-    Err.Raise vbObjectError + 4203, , "产品分类未找到可用基准日期"
+    Err.Raise vbObjectError + 4206, , SHEET_PRODUCT_CATEGORY & "没有有效基准日期。"
 End Function
 
-Private Function BuildHeaderMap(ByVal ws As Worksheet, ByVal headerRow As Long) As Object
-    Dim dict As Object
-    Set dict = CreateObject("Scripting.Dictionary")
-    dict.CompareMode = vbTextCompare
+Private Sub ReplaceFileSafely(ByVal tempPath As String, ByVal outputPath As String)
+    Dim backupPath As String
+    backupPath = outputPath & ".previous"
+    On Error GoTo ReplaceFail
+    If Len(Dir(backupPath)) > 0 Then Kill backupPath
+    If Len(Dir(outputPath)) > 0 Then Name outputPath As backupPath
+    Name tempPath As outputPath
+    If Len(Dir(backupPath)) > 0 Then Kill backupPath
+    Exit Sub
+ReplaceFail:
+    Dim originalError As String
+    originalError = Err.Description
+    On Error Resume Next
+    If Len(Dir(outputPath)) = 0 And Len(Dir(backupPath)) > 0 Then Name backupPath As outputPath
+    On Error GoTo 0
+    Err.Raise vbObjectError + 4207, , "替换输出文件失败：" & originalError
+End Sub
 
+Private Sub RecordLastRunMessage(ByVal messageText As String)
+    On Error Resume Next
+    With ThisWorkbook.Worksheets("配置说明")
+        .Range("A20").Value = "最近一次展示报表运行结果"
+        .Range("A21").Value = messageText
+    End With
+    On Error GoTo 0
+End Sub
+
+Private Sub RestoreApplicationState(ByVal screenUpdating As Boolean, ByVal enableEvents As Boolean, _
+                                    ByVal displayAlerts As Boolean, ByVal askToUpdateLinks As Boolean, _
+                                    ByVal calculation As XlCalculation)
+    Application.Calculation = calculation
+    Application.AskToUpdateLinks = askToUpdateLinks
+    Application.DisplayAlerts = displayAlerts
+    Application.EnableEvents = enableEvents
+    Application.ScreenUpdating = screenUpdating
+End Sub
+
+Private Function BuildHeaderMap(ByVal ws As Worksheet, ByVal headerRow As Long) As Object
+    Dim result As Object
+    Set result = CreateTextDictionary()
     Dim lastCol As Long
     lastCol = LastUsedColumn(ws)
-
     Dim c As Long
-    Dim headerText As String
     For c = 1 To lastCol
+        Dim headerText As String
         headerText = NormalizeText(ws.Cells(headerRow, c).Value)
         If Len(headerText) > 0 Then
-            If Not dict.Exists(headerText) Then dict.Add headerText, c
+            If Not result.Exists(headerText) Then result.Add headerText, c
         End If
     Next c
-
-    Set BuildHeaderMap = dict
+    Set BuildHeaderMap = result
 End Function
 
 Private Function LastUsedRow(ByVal ws As Worksheet) As Long
@@ -1569,11 +1093,10 @@ Private Function LastUsedColumn(ByVal ws As Worksheet) As Long
 End Function
 
 Private Function NormalizeText(ByVal value As Variant) As String
-    If IsError(value) Or IsEmpty(value) Then
+    If IsError(value) Or IsEmpty(value) Or IsNull(value) Then
         NormalizeText = vbNullString
         Exit Function
     End If
-
     Dim textValue As String
     textValue = CStr(value)
     textValue = Replace(textValue, ChrW$(12288), " ")
@@ -1582,30 +1105,28 @@ Private Function NormalizeText(ByVal value As Variant) As String
     NormalizeText = WorksheetFunction.Trim(textValue)
 End Function
 
+Private Function DateOnly(ByVal value As Date) As Date
+    DateOnly = DateSerial(Year(value), Month(value), Day(value))
+End Function
+
 Private Function TryReadDate(ByVal value As Variant, ByRef outDate As Date) As Boolean
     If IsDate(value) Then
-        outDate = DateValue(CDate(value))
+        outDate = DateOnly(CDate(value))
         TryReadDate = True
         Exit Function
     End If
-
     Dim textValue As String
     textValue = NormalizeText(value)
     If Len(textValue) = 0 Then Exit Function
-
-    If InStr(textValue, ".") > 0 Then
-        textValue = Left$(textValue, InStr(textValue, ".") - 1)
-    End If
-
+    If InStr(textValue, ".") > 0 Then textValue = Left$(textValue, InStr(textValue, ".") - 1)
     If Len(textValue) = 8 And IsNumeric(textValue) Then
         outDate = DateSerial(CInt(Left$(textValue, 4)), CInt(Mid$(textValue, 5, 2)), CInt(Right$(textValue, 2)))
         TryReadDate = True
         Exit Function
     End If
-
     textValue = Replace(Replace(textValue, ".", "-"), "/", "-")
     If IsDate(textValue) Then
-        outDate = DateValue(CDate(textValue))
+        outDate = DateOnly(CDate(textValue))
         TryReadDate = True
     End If
 End Function

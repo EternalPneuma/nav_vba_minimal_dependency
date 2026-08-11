@@ -187,7 +187,7 @@ ContinueSourceRow:
               "请继续运行 OnePage01_ExportChartData。"
     End If
 
-    MsgBox msg, vbInformation, "产品一页通"
+    ReportPipeline_MsgBox msg, vbInformation, "产品一页通"
     Exit Sub
 
 CleanFail:
@@ -208,7 +208,7 @@ CleanFail:
     If Len(failDescription) = 0 Then failDescription = "未知错误"
     If Len(failStep) = 0 Then failStep = "未记录"
 
-    MsgBox "产品一页通数据预检查失败" & vbCrLf & vbCrLf & _
+    ReportPipeline_MsgBox "产品一页通数据预检查失败" & vbCrLf & vbCrLf & _
            "错误信息：" & failDescription & vbCrLf & _
            "错误号：" & failNumber & vbCrLf & _
            "步骤：" & failStep, vbCritical, "产品一页通"

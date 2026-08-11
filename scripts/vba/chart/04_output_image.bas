@@ -39,7 +39,7 @@ Public Sub Chart04_ExportImages()
     Loop
       
     If Len(latestFile) = 0 Then
-        MsgBox "产品图片导出无法继续" & vbCrLf & vbCrLf & _
+        ReportPipeline_MsgBox "产品图片导出无法继续" & vbCrLf & vbCrLf & _
                "错误信息：未找到[产品净值汇总_yyyymmdd.xlsx]文件，请先运行[生成产品图表]。", vbExclamation, "产品图片导出"
         GoTo CleanUp
     End If
@@ -154,7 +154,7 @@ NextSheet:
         msg = msg & vbCrLf & vbCrLf & "注意事项：" & vbCrLf & _
               "异常：" & vbCrLf & Left(errMsg, Len(errMsg) - 2)
     End If
-    MsgBox msg, vbInformation, "产品图片导出"
+    ReportPipeline_MsgBox msg, vbInformation, "产品图片导出"
 
 CleanUp:
     Application.ScreenUpdating = True

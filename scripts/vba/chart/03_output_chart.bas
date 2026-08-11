@@ -37,6 +37,8 @@ Public Sub Chart03_GenerateCharts()
     
     Dim wbDB As Workbook: Set wbDB = ThisWorkbook
     Dim dbPath As String: dbPath = wbDB.Path & "\"
+    Dim chartThemeMap As Object
+    Set chartThemeMap = ReportConfig_GetChartThemeMap()
     
     '--- 1. 检查4个模板文件 ---
     Dim tplPaths(1 To 4) As String
@@ -52,7 +54,7 @@ Public Sub Chart03_GenerateCharts()
         End If
     Next i
     If Len(missing) > 0 Then
-        MsgBox "产品图表生成无法继续" & vbCrLf & vbCrLf & _
+        ReportPipeline_MsgBox "产品图表生成无法继续" & vbCrLf & vbCrLf & _
                "错误信息：缺少模板文件，请检查：" & missing, vbCritical, "产品图表生成"
         GoTo CleanUp
     End If
@@ -77,7 +79,7 @@ Public Sub Chart03_GenerateCharts()
     Loop
     
     If Len(latestFile) = 0 Then
-        MsgBox "产品图表生成无法继续" & vbCrLf & vbCrLf & _
+        ReportPipeline_MsgBox "产品图表生成无法继续" & vbCrLf & vbCrLf & _
                "错误信息：未找到[产品净值汇总_yyyymmdd.xlsx]文件，请先运行[输出产品汇总]。", vbExclamation, "产品图表生成"
         GoTo CleanUp
     End If
@@ -136,6 +138,14 @@ Public Sub Chart03_GenerateCharts()
         End If
         
         Dim prodShort As String: prodShort = ws.name
+        Dim productCode As String: productCode = Trim$(CStr(ws.Range("B2").Value))
+        If Not chartThemeMap.Exists(productCode) Then
+            errSheets = errSheets & ws.name & "(报表配置未引用该产品), "
+            GoTo NextSheet
+        End If
+        Dim requiredThemes As String: requiredThemes = CStr(chartThemeMap(productCode))
+        Dim needsRed As Boolean: needsRed = (InStr(1, requiredThemes, "|红|", vbTextCompare) > 0)
+        Dim needsBlue As Boolean: needsBlue = (InStr(1, requiredThemes, "|蓝|", vbTextCompare) > 0)
         
         ' 计算4个chart的位置(2列2行)
         Dim baseLeft As Single, baseTop As Single
@@ -144,28 +154,27 @@ Public Sub Chart03_GenerateCharts()
         
         On Error GoTo SheetErr
         
-        ' Chart 1: 净值-红 (左上)
-        CreateChart ws, dateRngNav, navRng, tplPaths(1), _
-            "chart_净值_红", prodShort & "单位净值表现", _
-            baseLeft, baseTop, False, 1#, CHART_HEIGHT_RED
-        
-        ' Chart 2: 净值-蓝 (左下)
-        CreateChart ws, dateRngNav, navRng, tplPaths(2), _
-            "chart_净值_蓝", prodShort & "单位净值表现", _
-            baseLeft, baseTop + CHART_HEIGHT_RED + CHART_GAP, False, 1#, CHART_HEIGHT_BLUE
-    
-        ' Chart 3 & 4: 收益率(强制Y轴下限为0)
-        If hasYieldData Then
-            ' Chart 3: 收益率-红 (右上)
-            CreateChart ws, dateRngYield, yieldRng, tplPaths(3), _
-                "chart_收益率_红", prodShort & "30日年化收益率" & vbLf & "(单位:%)", _
-                baseLeft + CHART_WIDTH + CHART_GAP, baseTop, True, 0#, CHART_HEIGHT_RED
-            
-            ' Chart 4: 收益率-蓝 (右下)
-            CreateChart ws, dateRngYield, yieldRng, tplPaths(4), _
-                "chart_收益率_蓝", prodShort & "30日年化收益率" & vbLf & "(单位:%)", _
-                baseLeft + CHART_WIDTH + CHART_GAP, baseTop + CHART_HEIGHT_RED + CHART_GAP, True, 0#, CHART_HEIGHT_BLUE
-         End If
+        If needsRed Then
+            CreateChart ws, dateRngNav, navRng, tplPaths(1), _
+                "chart_净值_红", prodShort & "单位净值表现", _
+                baseLeft, baseTop, False, 1#, CHART_HEIGHT_RED
+            If hasYieldData Then
+                CreateChart ws, dateRngYield, yieldRng, tplPaths(3), _
+                    "chart_收益率_红", prodShort & "30日年化收益率" & vbLf & "(单位:%)", _
+                    baseLeft + CHART_WIDTH + CHART_GAP, baseTop, True, 0#, CHART_HEIGHT_RED
+            End If
+        End If
+
+        If needsBlue Then
+            CreateChart ws, dateRngNav, navRng, tplPaths(2), _
+                "chart_净值_蓝", prodShort & "单位净值表现", _
+                baseLeft, baseTop + CHART_HEIGHT_RED + CHART_GAP, False, 1#, CHART_HEIGHT_BLUE
+            If hasYieldData Then
+                CreateChart ws, dateRngYield, yieldRng, tplPaths(4), _
+                    "chart_收益率_蓝", prodShort & "30日年化收益率" & vbLf & "(单位:%)", _
+                    baseLeft + CHART_WIDTH + CHART_GAP, baseTop + CHART_HEIGHT_RED + CHART_GAP, True, 0#, CHART_HEIGHT_BLUE
+            End If
+        End If
         
         processedCount = processedCount + 1
         On Error GoTo 0
@@ -195,7 +204,7 @@ NextSheet:
               "以下sheet处理出错：" & vbCrLf & Left(errSheets, Len(errSheets) - 2)
     End If
     
-    MsgBox msg, vbInformation, "产品图表生成"
+    ReportPipeline_MsgBox msg, vbInformation, "产品图表生成"
 
 CleanUp:
     Application.ScreenUpdating = True

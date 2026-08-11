@@ -108,7 +108,7 @@ NextSheet:
         If Len(skippedText) > 0 Then finalMsg = finalMsg & vbCrLf & "跳过明细：" & vbCrLf & skippedText
         If Len(errText) > 0 Then finalMsg = finalMsg & vbCrLf & "异常明细：" & vbCrLf & errText
     End If
-    MsgBox finalMsg, vbInformation, "产品一页通"
+    ReportPipeline_MsgBox finalMsg, vbInformation, "产品一页通"
     Exit Sub
 
 CleanFail:
@@ -131,7 +131,7 @@ CleanFail:
     If Len(failDescription) = 0 Then failDescription = "未知错误"
     If Len(failStep) = 0 Then failStep = "未记录"
 
-    MsgBox "产品一页通图表生成失败" & vbCrLf & vbCrLf & _
+    ReportPipeline_MsgBox "产品一页通图表生成失败" & vbCrLf & vbCrLf & _
            "错误信息：" & failDescription & vbCrLf & _
            "错误号：" & failNumber & vbCrLf & _
            "步骤：" & failStep, vbCritical, "产品一页通"

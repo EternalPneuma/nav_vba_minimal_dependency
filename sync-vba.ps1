@@ -33,22 +33,37 @@ if (-not (Test-Path $resolvedWorkbook)) {
 
 # ---------- 编码检测 ----------
 
-# 源文件编码（git 仓库中统一使用 UTF-8）
-$sourceEncoding = [System.Text.UTF8Encoding]::new($false)  # UTF-8 without BOM
+# PowerShell 7 中 Encoding.Default 固定为 UTF-8，不能代表 VBE 实际使用的 Windows ANSI code page。
+# 直接调用 Win32 GetACP，并且只在中文 CP936 环境中执行，避免 VBE 对临时文件二次误解码。
+if (-not ("VbaSync.NativeMethods" -as [type])) {
+    Add-Type -TypeDefinition @"
+using System.Runtime.InteropServices;
+namespace VbaSync {
+    public static class NativeMethods {
+        [DllImport("kernel32.dll")]
+        public static extern uint GetACP();
+    }
+}
+"@
+}
 
-# 系统默认编码（中文 Windows 为 GB2312/CP936），VBE Import 以此编码读取文件
-$systemEncoding = [System.Text.Encoding]::Default
+$windowsAnsiCodePage = [VbaSync.NativeMethods]::GetACP()
+if ($windowsAnsiCodePage -ne 936) {
+    throw "当前 Windows ANSI code page 为 CP$windowsAnsiCodePage，VBE 中文源码同步要求 CP936。请关闭 Windows 的[使用 Unicode UTF-8 提供全球语言支持]选项，或改在 CP936 中文 Windows 上运行。"
+}
 
-# 创建带容错 fallback 的编码器：无法转换的字符用 ? 替代，避免抛异常
-$safeSystemEncoding = [System.Text.Encoding]::GetEncoding(
-    $systemEncoding.CodePage,
-    [System.Text.EncoderFallback]::ReplacementFallback,
-    [System.Text.DecoderFallback]::ReplacementFallback
+# 严格 UTF-8：允许有无 BOM，但非法 UTF-8 字节必须报错。
+$sourceEncoding = [System.Text.UTF8Encoding]::new($false, $true)
+# 严格 CP936：任何不可表示字符必须报错，绝不静默替换为 ?。
+$vbeEncoding = [System.Text.Encoding]::GetEncoding(
+    936,
+    [System.Text.EncoderFallback]::ExceptionFallback,
+    [System.Text.DecoderFallback]::ExceptionFallback
 )
 
 Write-Host "仓库根目录: $RepoRoot"
 Write-Host "目标工作簿: $resolvedWorkbook"
-Write-Host "系统编码: $($systemEncoding.EncodingName) (CP$($systemEncoding.CodePage))"
+Write-Host "VBE 导入编码: $($vbeEncoding.EncodingName) (CP$windowsAnsiCodePage)"
 
 # ---------- 模块清单 ----------
 
@@ -144,20 +159,115 @@ function Get-VbaModuleName {
     return $name
 }
 
-# 编码检测与读取：尝试 UTF-8 读取，失败时回退到系统编码
+function Get-ImportComponentInfo {
+    param($File)
+
+    $baseName = [System.IO.Path]::GetFileNameWithoutExtension($File.Name)
+    $ext = [System.IO.Path]::GetExtension($File.Name)
+    $fileGroup = ""
+    foreach ($g in $groups) {
+        if ($File.FullName -match [regex]::Escape((Join-Path $RepoRoot $moduleMap[$g].path))) {
+            $fileGroup = $g
+            break
+        }
+    }
+
+    $componentKey = "$fileGroup/$($File.Name)"
+    if ($componentNameMap.ContainsKey($componentKey)) {
+        $vbaName = $componentNameMap[$componentKey]
+    } elseif ($ext -eq ".frm") {
+        $vbaName = $baseName
+    } else {
+        $vbaName = Get-VbaModuleName -BaseName $baseName -GroupName $fileGroup
+    }
+
+    return @{
+        BaseName = $baseName
+        Extension = $ext
+        Group = $fileGroup
+        VbaName = $vbaName
+        ActualComponentName = if ($ext -eq ".frm") { "frm$vbaName" } else { $vbaName }
+    }
+}
+
 function Read-VbaModuleFile {
     param([string]$FilePath)
     try {
-        # 优先按 UTF-8 读取（匹配 git 仓库中的源文件编码）
         return [System.IO.File]::ReadAllText($FilePath, $sourceEncoding)
-    } catch {
+    } catch [System.Text.DecoderFallbackException] {
+        throw "模块文件不是有效的 UTF-8: $FilePath"
+    }
+}
+
+function Get-UnencodableCharacters {
+    param([string]$Content)
+
+    $issues = @()
+    $line = 1
+    for ($i = 0; $i -lt $Content.Length; $i++) {
+        $charLength = 1
+        $codePoint = [int][char]$Content[$i]
+        if ([char]::IsHighSurrogate($Content[$i]) -and
+            $i + 1 -lt $Content.Length -and
+            [char]::IsLowSurrogate($Content[$i + 1])) {
+            $codePoint = [char]::ConvertToUtf32($Content[$i], $Content[$i + 1])
+            $charLength = 2
+        }
+        $character = $Content.Substring($i, $charLength)
         try {
-            # UTF-8 失败则尝试系统默认编码
-            return [System.IO.File]::ReadAllText($FilePath, $systemEncoding)
-        } catch {
-            throw "无法读取模块文件，已尝试 UTF-8 和系统默认编码: $FilePath"
+            $null = $vbeEncoding.GetBytes($character)
+        } catch [System.Text.EncoderFallbackException] {
+            $issues += "第 $line 行 '$character' (U+$($codePoint.ToString('X4')))"
+            if ($issues.Count -ge 10) { break }
+        }
+        if ($Content[$i] -eq "`n") { $line++ }
+        if ($charLength -eq 2) { $i++ }
+    }
+    return $issues
+}
+
+function Get-CanonicalCode {
+    param([string]$Content)
+
+    $canonical = ($Content -replace "`r`n", "`n" -replace "`r", "`n").TrimEnd([char[]]"`n")
+    # VBE 会自动统一标识符大小写并删除行尾空白；这些变化与编码无关。
+    $lines = @($canonical.Split([char]"`n"))
+    $normalizedLines = @($lines | ForEach-Object { $_.TrimEnd([char[]]" `t") })
+    return ($normalizedLines -join "`n").ToLowerInvariant()
+}
+
+function Assert-ImportedCodeMatches {
+    param(
+        $Component,
+        [string]$ExpectedContent,
+        [string]$OriginalName
+    )
+
+    $codeModule = $Component.CodeModule
+    $actualContent = if ($codeModule.CountOfLines -gt 0) {
+        $codeModule.Lines(1, $codeModule.CountOfLines)
+    } else {
+        ""
+    }
+    $expected = Get-CanonicalCode -Content $ExpectedContent
+    $actual = Get-CanonicalCode -Content $actualContent
+    if ($actual -ceq $expected) { return }
+
+    $expectedLines = @($expected.Split([char]"`n"))
+    $actualLines = @($actual.Split([char]"`n"))
+    $maxLines = [Math]::Max($expectedLines.Count, $actualLines.Count)
+    $differentLine = 1
+    for ($i = 0; $i -lt $maxLines; $i++) {
+        $expectedLine = if ($i -lt $expectedLines.Count) { $expectedLines[$i] } else { "<缺失>" }
+        $actualLine = if ($i -lt $actualLines.Count) { $actualLines[$i] } else { "<缺失>" }
+        if ($expectedLine -cne $actualLine) {
+            $differentLine = $i + 1
+            break
         }
     }
+    $expectedPreview = if ($expectedLine.Length -gt 120) { $expectedLine.Substring(0, 120) + "..." } else { $expectedLine }
+    $actualPreview = if ($actualLine.Length -gt 120) { $actualLine.Substring(0, 120) + "..." } else { $actualLine }
+    throw "导入后代码校验失败: $OriginalName，第 $differentLine 行与 UTF-8 源码不一致；期望=[$expectedPreview]；实际=[$actualPreview]"
 }
 
 # 统一导入：将内容写入系统编码临时文件，用 VBComponents.Import 导入
@@ -177,42 +287,47 @@ function Import-VbaModule {
     $normalized = $Content -replace "`r`n", "`n" -replace "`n", "`r`n"
 
     if ($ext -eq ".frm") {
-        # UserForm：不能直接 Import，优先复用已有窗体原地更新代码
+        # UserForm 复用已有设计器，只通过 CP936 临时文件更新代码，避免 AddFromString 转码。
         $formName = "frm$BaseName"
-        $existingForm = $null
-        foreach ($c in $VBProject.VBComponents) {
-            if ($c.Name -eq $formName) { $existingForm = $c; break }
-        }
-        if ($existingForm) {
-            # 已存在：清空代码后重新注入
-            $codeMod = $existingForm.CodeModule
-            $totalLines = $codeMod.CountOfLines
-            if ($totalLines -gt 0) { $codeMod.DeleteLines(1, $totalLines) }
-            $codeMod.AddFromString($normalized)
-            $importedComponent = $existingForm
-        } else {
-            # 不存在：创建新窗体（带重试，COM 可能竞争）
-            $maxRetries = 3
-            $success = $false
-            for ($retry = 0; $retry -lt $maxRetries -and -not $success; $retry++) {
-                try {
-                    if ($retry -gt 0) {
-                        Start-Sleep -Milliseconds 500
-                        foreach ($c in $VBProject.VBComponents) {
-                            if ($c.Name -eq $formName) { $VBProject.VBComponents.Remove($c); break }
+        $tempFile = Join-Path $tempDir "$formName.code.txt"
+        [System.IO.File]::WriteAllText($tempFile, $normalized, $vbeEncoding)
+        try {
+            $existingForm = $null
+            foreach ($c in $VBProject.VBComponents) {
+                if ($c.Name -eq $formName) { $existingForm = $c; break }
+            }
+            if ($existingForm) {
+                $codeMod = $existingForm.CodeModule
+                $totalLines = $codeMod.CountOfLines
+                if ($totalLines -gt 0) { $codeMod.DeleteLines(1, $totalLines) }
+                $null = $codeMod.AddFromFile($tempFile)
+                $importedComponent = $existingForm
+            } else {
+                # 不存在：创建新窗体（带重试，COM 可能竞争）
+                $maxRetries = 3
+                $success = $false
+                for ($retry = 0; $retry -lt $maxRetries -and -not $success; $retry++) {
+                    try {
+                        if ($retry -gt 0) {
+                            Start-Sleep -Milliseconds 500
+                            foreach ($c in $VBProject.VBComponents) {
+                                if ($c.Name -eq $formName) { $VBProject.VBComponents.Remove($c); break }
+                            }
+                            Write-Host "    重试 UserForm ($($retry+1)/$maxRetries)..." -ForegroundColor DarkYellow
                         }
-                        Write-Host "    重试 UserForm ($($retry+1)/$maxRetries)..." -ForegroundColor DarkYellow
+                        $importedComponent = $VBProject.VBComponents.Add(3)
+                        Start-Sleep -Milliseconds 100
+                        $importedComponent.Name = $formName
+                        Start-Sleep -Milliseconds 100
+                        $null = $importedComponent.CodeModule.AddFromFile($tempFile)
+                        $success = $true
+                    } catch {
+                        if ($retry -eq $maxRetries - 1) { throw $_ }
                     }
-                    $importedComponent = $VBProject.VBComponents.Add(3)
-                    Start-Sleep -Milliseconds 100
-                    $importedComponent.Name = $formName
-                    Start-Sleep -Milliseconds 100
-                    $importedComponent.CodeModule.AddFromString($normalized)
-                    $success = $true
-                } catch {
-                    if ($retry -eq $maxRetries - 1) { throw $_ }
                 }
             }
+        } finally {
+            Remove-Item $tempFile -Force -ErrorAction SilentlyContinue
         }
     } elseif ($ext -eq ".cls") {
         # 类模块：需要完整 VBE 类模块导出头，Import 才能识别为 Class 而非 Standard
@@ -227,29 +342,56 @@ function Import-VbaModule {
         $fileContent += "Attribute VB_Exposed = False`r`n"
         $fileContent += $normalized
         $tempFile = Join-Path $tempDir "$BaseName$Extension"
-        [System.IO.File]::WriteAllText($tempFile, $fileContent, $safeSystemEncoding)
+        [System.IO.File]::WriteAllText($tempFile, $fileContent, $vbeEncoding)
         try {
             $importedComponent = $VBProject.VBComponents.Import($tempFile)
-        } catch {
-            [System.IO.File]::WriteAllText($tempFile, $fileContent, $sourceEncoding)
-            $importedComponent = $VBProject.VBComponents.Import($tempFile)
+        } finally {
+            Remove-Item $tempFile -Force -ErrorAction SilentlyContinue
         }
-        Remove-Item $tempFile -Force -ErrorAction SilentlyContinue
     } else {
-        # 标准模块：添加 Attribute VB_Name，写入系统编码临时文件后 Import
+        # 标准模块：添加 Attribute VB_Name，写入 CP936 临时文件后 Import
         $fileContent = "Attribute VB_Name = `"$BaseName`"`r`n" + $normalized
         $tempFile = Join-Path $tempDir "$BaseName$Extension"
-        [System.IO.File]::WriteAllText($tempFile, $fileContent, $safeSystemEncoding)
+        [System.IO.File]::WriteAllText($tempFile, $fileContent, $vbeEncoding)
         try {
             $importedComponent = $VBProject.VBComponents.Import($tempFile)
-        } catch {
-            [System.IO.File]::WriteAllText($tempFile, $fileContent, $sourceEncoding)
-            $importedComponent = $VBProject.VBComponents.Import($tempFile)
+        } finally {
+            Remove-Item $tempFile -Force -ErrorAction SilentlyContinue
         }
-        Remove-Item $tempFile -Force -ErrorAction SilentlyContinue
     }
 
     return $importedComponent
+}
+
+# ---------- 导入前严格预检 ----------
+
+Write-Host "`n正在预检 UTF-8、CRLF 与 CP936 兼容性..."
+$validatedContent = @{}
+$validationErrors = @()
+foreach ($file in $filesToImport) {
+    try {
+        $content = Read-VbaModuleFile -FilePath $file.FullName
+        $withoutCrLf = $content.Replace("`r`n", "")
+        if ($withoutCrLf.Contains("`r") -or $withoutCrLf.Contains("`n")) {
+            throw "存在非 CRLF 行尾"
+        }
+        $encodingIssues = @(Get-UnencodableCharacters -Content $content)
+        if ($encodingIssues.Count -gt 0) {
+            throw "包含 CP936 无法表示的字符: $($encodingIssues -join '; ')"
+        }
+        # 强制执行一次完整转换；与逐字符诊断相互独立，防止遗漏编码器状态问题。
+        $null = $vbeEncoding.GetBytes($content)
+        $validatedContent[$file.FullName] = $content
+        Write-Host "  通过: $($file.Name)" -ForegroundColor DarkGreen
+    } catch {
+        $validationErrors += "$($file.FullName): $($_.Exception.Message)"
+        Write-Host "  失败: $($file.Name) — $($_.Exception.Message)" -ForegroundColor Red
+    }
+}
+if ($validationErrors.Count -gt 0) {
+    Write-Host "`n预检失败，尚未打开或修改工作簿：" -ForegroundColor Red
+    $validationErrors | ForEach-Object { Write-Host "  - $_" -ForegroundColor Red }
+    exit 1
 }
 
 # ---------- Excel COM 导入 ----------
@@ -263,6 +405,9 @@ $excel.DisplayAlerts = $false
 try {
     $wb = $excel.Workbooks.Open((Get-Item $resolvedWorkbook).FullName)
     $vbProject = $wb.VBProject
+    if ($null -eq $vbProject) {
+        throw "无法访问 VBA 工程。请关闭所有 Excel 窗口，在信任中心启用[信任对 VBA 工程对象模型的访问]，然后重新打开 Excel。"
+    }
     Write-Host " 完成"
 
     # const: VBE component types
@@ -274,17 +419,29 @@ try {
     $imported = 0
     $errors = @()
 
-    # 清理用户模块（避免旧名遗留），保留内置模块和 UserForm（UserForm 将被原地更新）
+    # 清理待替换模块。全量同步时清理所有用户模块；按组同步时不得删除其他组。
     Write-Host "  清理旧模块..." -NoNewline
     $removedCount = 0
     $builtInNames = @("ThisWorkbook")
     foreach ($comp in $vbProject.VBComponents) {
         if ($comp.Type -eq $vbext_ct_Document) { $builtInNames += $comp.Name }
     }
+
+    $recognizedGroups = @($groups | Where-Object { $moduleMap.ContainsKey($_) } | Select-Object -Unique)
+    $isFullSync = ($recognizedGroups.Count -eq $moduleMap.Count)
+    $selectedComponentNames = @{}
+    if (-not $isFullSync) {
+        foreach ($sourceFile in $filesToImport) {
+            $info = Get-ImportComponentInfo -File $sourceFile
+            $selectedComponentNames[$info.ActualComponentName] = $true
+        }
+    }
+
     $toRemove = @()
     foreach ($comp in $vbProject.VBComponents) {
-        # 跳过内置模块和 UserForm（UserForm 删除后 VBE 资源释放慢，改为后续原地更新）
-        if ($comp.Name -notin $builtInNames -and $comp.Type -ne $vbext_ct_MSForm) {
+        # UserForm 原地更新；内置模块永不删除。
+        if ($comp.Name -in $builtInNames -or $comp.Type -eq $vbext_ct_MSForm) { continue }
+        if ($isFullSync -or $selectedComponentNames.ContainsKey($comp.Name)) {
             $toRemove += $comp
         }
     }
@@ -304,38 +461,23 @@ try {
     # 排序：UserForm 优先导入（VBE 创建窗体需要更多 COM 资源，趁早处理）
     $sortedFiles = @($filesToImport | Sort-Object { if ($_.Extension -eq ".frm") { return 0 } else { return 1 } }, { $_.Name })
     foreach ($file in $sortedFiles) {
-        $baseName = [System.IO.Path]::GetFileNameWithoutExtension($file.Name)
-        $ext = [System.IO.Path]::GetExtension($file.Name)
-
-        # 确定模块所属 group（用于生成合法的 VBA 模块名）
-        $fileGroup = ""
-        foreach ($g in $groups) {
-            if ($file.FullName -match [regex]::Escape((Join-Path $RepoRoot $moduleMap[$g].path))) {
-                $fileGroup = $g
-                break
-            }
-        }
-        # 生成合法 VBA 模块名（不能以数字开头）
-        # 某些组件在其他代码中以固定名称引用，优先使用显式映射。
-        $componentKey = "$fileGroup/$($file.Name)"
-        if ($componentNameMap.ContainsKey($componentKey)) {
-            $vbaName = $componentNameMap[$componentKey]
-        } elseif ($ext -eq ".frm") {
-            # .frm 文件导入后 VBE 自动加 "frm" 前缀，已满足字母开头要求
-            $vbaName = $baseName
-        } else {
-            $vbaName = Get-VbaModuleName -BaseName $baseName -GroupName $fileGroup
-        }
+        $componentInfo = Get-ImportComponentInfo -File $file
+        $baseName = $componentInfo.BaseName
+        $ext = $componentInfo.Extension
+        $fileGroup = $componentInfo.Group
+        $vbaName = $componentInfo.VbaName
 
         try {
-            # ---- 读取源文件 ----
-            $content = Read-VbaModuleFile -FilePath $file.FullName
+            # 复用预检时严格解码的内容，避免预检与实际导入之间再次读取。
+            $content = $validatedContent[$file.FullName]
 
-            # ---- 统一通过临时文件 + Import 导入（避免 AddFromString 编码问题） ----
+            # 统一通过 CP936 临时文件导入，并从 VBE 读回逐字校验。
             $label = if ($ext -eq ".frm") { "[UserForm]" } else { "" }
-            $null = Import-VbaModule -VBProject $vbProject -Content $content `
+            $importedComponent = Import-VbaModule -VBProject $vbProject -Content $content `
                 -BaseName $vbaName -Extension $ext -OriginalName $file.Name
-            Write-Host "  导入: $($file.Name) → $vbaName $label" -ForegroundColor Green
+            Assert-ImportedCodeMatches -Component $importedComponent `
+                -ExpectedContent $content -OriginalName $file.Name
+            Write-Host "  导入并校验: $($file.Name) → $vbaName $label" -ForegroundColor Green
 
             $imported++
         } catch {

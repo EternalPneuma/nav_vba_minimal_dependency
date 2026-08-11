@@ -18,7 +18,7 @@ End Sub
 ' --- Backward-compatible aliases ---
 Private Sub ImportNAVIncremental181Core()
     Dim confirmResult As VbMsgBoxResult
-    confirmResult = MsgBox("运行前请确认：" & vbCrLf & vbCrLf & _
+    confirmResult = ReportPipeline_MsgBox("运行前请确认：" & vbCrLf & vbCrLf & _
                            "1. 已经完成 181_多账套净值查询。" & vbCrLf & _
                            "2. 查询结果已保存到当前数据库工作簿同级目录。" & vbCrLf & _
                            "3. 文件名保持系统默认格式：" & SOURCE_FILE_PREFIX & "yyyymmdd" & SOURCE_FILE_EXT & vbCrLf & vbCrLf & _
@@ -115,7 +115,7 @@ Private Sub ImportNAVIncremental181Core()
         message = message & vbCrLf & vbCrLf & "注意事项：" & vbCrLf & _
                   "读取失败文件/工作表：" & vbCrLf & failedFiles
     End If
-    MsgBox message, vbInformation, "净值数据增量导入"
+    ReportPipeline_MsgBox message, vbInformation, "净值数据增量导入"
     Exit Sub
 
 CleanFail:
@@ -124,7 +124,7 @@ CleanFail:
     Application.AskToUpdateLinks = oldAskToUpdateLinks
     Application.EnableEvents = oldEnableEvents
     Application.ScreenUpdating = oldScreenUpdating
-    MsgBox "净值数据增量导入失败" & vbCrLf & vbCrLf & _
+    ReportPipeline_MsgBox "净值数据增量导入失败" & vbCrLf & vbCrLf & _
            "错误信息：" & Err.Description, vbCritical, "净值数据增量导入"
 End Sub
 

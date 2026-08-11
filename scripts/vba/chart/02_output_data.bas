@@ -33,6 +33,10 @@ Public Sub Chart02_ExportProductSummary()
     Dim wbDB As Workbook: Set wbDB = ThisWorkbook
     Dim wsDim As Worksheet: Set wsDim = wbDB.Worksheets(SHEET_PRODUCT_INFO)
     Dim wsData As Worksheet: Set wsData = wbDB.Worksheets(SHEET_CHART_NAV_DATA)
+
+    ' 报表图表配置是导出候选的唯一来源。
+    Dim configuredChartCodes As Object
+    Set configuredChartCodes = ReportConfig_GetRequiredChartCodeSet()
     
     ' 初始化填补统计收集器
     Set g_fillCounts = CreateObject("Scripting.Dictionary")
@@ -48,7 +52,7 @@ Public Sub Chart02_ExportProductSummary()
     Dim dimCodeCol As Long
     dimCodeCol = FindFirstExistingHeader(dimHeaderMap, Array(COL_TRUST_CODE, COL_PRODUCT_CODE, COL_PRODUCT_CODE_ALT, COL_CODE))
     If dimCodeCol = 0 Then
-        MsgBox "产品净值汇总导出无法继续" & vbCrLf & vbCrLf & _
+        ReportPipeline_MsgBox "产品净值汇总导出无法继续" & vbCrLf & vbCrLf & _
                "错误信息：产品信息中缺少可用于匹配的代码字段：" & COL_TRUST_CODE & " / " & COL_PRODUCT_CODE & " / " & COL_PRODUCT_CODE_ALT, _
                vbExclamation, "产品净值汇总导出"
         GoTo CleanUp
@@ -57,13 +61,13 @@ Public Sub Chart02_ExportProductSummary()
     Dim dimShortCol As Long
     dimShortCol = FindFirstExistingHeader(dimHeaderMap, Array(COL_PRODUCT_SHORT, COL_PRODUCT_NAME, COL_PRODUCT_FULL_NAME, COL_TRUST_NAME))
     If dimShortCol = 0 Then
-        MsgBox "产品净值汇总导出无法继续" & vbCrLf & vbCrLf & _
+        ReportPipeline_MsgBox "产品净值汇总导出无法继续" & vbCrLf & vbCrLf & _
                "错误信息：产品信息中缺少可用于命名sheet的名称字段：" & COL_PRODUCT_SHORT & " / " & COL_PRODUCT_NAME & " / " & COL_PRODUCT_FULL_NAME, _
                vbExclamation, "产品净值汇总导出"
         GoTo CleanUp
     End If
     
-    ' “图表导出”为可选字段：存在时仅“是/Y/YES/1/TRUE/启用”可导出；不存在时保持原有全量导出行为。
+    ' “产品信息”的旧“图表导出”字段不再控制周报图表，保留字段只为工作簿兼容。
     Dim dimChartExportCol As Long
     dimChartExportCol = FindFirstExistingHeader(dimHeaderMap, Array(COL_CHART_EXPORT))
     
@@ -74,7 +78,7 @@ Public Sub Chart02_ExportProductSummary()
     Dim dimLastRow As Long
     dimLastRow = wsDim.Cells(wsDim.Rows.Count, dimCodeCol).End(xlUp).Row
     If dimLastRow < 2 Then
-        MsgBox "产品净值汇总导出无法继续" & vbCrLf & vbCrLf & _
+        ReportPipeline_MsgBox "产品净值汇总导出无法继续" & vbCrLf & vbCrLf & _
                "错误信息：产品信息中没有数据，请先完善产品信息。", vbExclamation, "产品净值汇总导出"
         GoTo CleanUp
     End If
@@ -86,17 +90,13 @@ Public Sub Chart02_ExportProductSummary()
         prodShort = NormalizeText(wsDim.Cells(i, dimShortCol).value)
         If Len(prodCode) > 0 And Len(prodShort) > 0 Then
             dimDict(prodCode) = prodShort
-            If dimChartExportCol = 0 Then
-                chartExportEnabled = True
-            Else
-                chartExportEnabled = IsChartExportEnabled(wsDim.Cells(i, dimChartExportCol).value)
-            End If
+            chartExportEnabled = configuredChartCodes.Exists(prodCode)
             dimExportDict(prodCode) = chartExportEnabled
         End If
     Next i
         
     If dimDict.Count = 0 Then
-        MsgBox "产品净值汇总导出无法继续" & vbCrLf & vbCrLf & _
+        ReportPipeline_MsgBox "产品净值汇总导出无法继续" & vbCrLf & vbCrLf & _
                "错误信息：产品信息中未读取到有效的产品编号/信托计划代码和产品简称/产品名称。", vbExclamation, "产品净值汇总导出"
         GoTo CleanUp
     End If
@@ -106,7 +106,7 @@ Public Sub Chart02_ExportProductSummary()
     dataLastRow = wsData.Cells(wsData.Rows.Count, "A").End(xlUp).Row
     
     If dataLastRow < 2 Then
-        MsgBox "产品净值汇总导出无法继续" & vbCrLf & vbCrLf & _
+        ReportPipeline_MsgBox "产品净值汇总导出无法继续" & vbCrLf & vbCrLf & _
                "错误信息：绘图净值数据中没有数据可导出。", vbExclamation, "产品净值汇总导出"
         GoTo CleanUp
     End If
@@ -297,7 +297,7 @@ NextProduct:
     '--- 4. 保存文件 ---
     If exportedCount = 0 Then
         wbOut.Close SaveChanges:=False
-        MsgBox "产品净值汇总导出无法继续" & vbCrLf & vbCrLf & _
+        ReportPipeline_MsgBox "产品净值汇总导出无法继续" & vbCrLf & vbCrLf & _
                "错误信息：没有可导出的产品数据。", vbExclamation, "产品净值汇总导出"
         GoTo CleanUp
     End If
@@ -349,7 +349,7 @@ NextProduct:
               "详情见导出文件“数据摘要”sheet，原始有效值已保留。"
     End If
         
-    MsgBox msg, vbInformation, "产品净值汇总导出"
+    ReportPipeline_MsgBox msg, vbInformation, "产品净值汇总导出"
         
 CleanUp:
     Application.ScreenUpdating = True

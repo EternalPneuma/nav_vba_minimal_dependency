@@ -45,7 +45,7 @@ Public Sub Weekly01_UpdateDependencies()
     Dim assetUpdated As Long
     assetUpdated = UpdateUnderlyingAssetDescriptions(wsAsset, wsMapping, latestNavByCode)
     
-    MsgBox "推荐材料依赖数据更新完成" & vbCrLf & vbCrLf & _
+    ReportPipeline_MsgBox "推荐材料依赖数据更新完成" & vbCrLf & vbCrLf & _
            "耗时：" & Format(Timer - t0, "0.0") & " 秒" & vbCrLf & vbCrLf & _
            "处理结果：" & vbCrLf & _
            "产品规模更新行数：" & productUpdated & vbCrLf & _
@@ -59,7 +59,7 @@ CleanExit:
     Exit Sub
 
 EH:
-    MsgBox "推荐材料依赖数据更新失败" & vbCrLf & vbCrLf & _
+    ReportPipeline_MsgBox "推荐材料依赖数据更新失败" & vbCrLf & vbCrLf & _
            "错误信息：" & Err.Description, vbExclamation, "推荐材料依赖数据更新"
     Resume CleanExit
 End Sub
