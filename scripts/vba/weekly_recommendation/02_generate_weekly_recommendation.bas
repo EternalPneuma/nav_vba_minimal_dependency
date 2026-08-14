@@ -22,6 +22,52 @@ Private Const SUBTITLE_FONT_SIZE As Long = 20
 Private Const NORMAL_FONT_SIZE As Long = 18
 Private Const NORMAL_ROW_HEIGHT As Double = 30
 
+Public Sub Weekly02_EnsureChartImagesReady()
+    Dim startedBatch As Boolean
+    On Error GoTo EH
+    If Not ReportPipeline_IsBatchMode() Then
+        ReportPipeline_BeginBatch
+        startedBatch = True
+    End If
+    Report00_RequireValidConfiguration
+
+    Dim baseDate As Date
+    baseDate = GetBaseDate(RequireSheet(ThisWorkbook, SHEET_PRODUCT_CATEGORY))
+
+    Dim missingImages As String
+    missingImages = GetMissingWeeklyChartImages(baseDate)
+    If Len(missingImages) = 0 Then
+        If startedBatch Then ReportPipeline_EndBatch
+        ReportPipeline_MsgBox "推荐材料所需图片已齐全，已跳过图表生成步骤。", _
+                              vbInformation, "推荐材料图表检查"
+        Exit Sub
+    End If
+
+    Chart01_ImportNavData
+    ReportPipeline_ThrowIfFailed
+    Chart02_ExportProductSummary
+    ReportPipeline_ThrowIfFailed
+    Chart03_GenerateCharts
+    ReportPipeline_ThrowIfFailed
+    Chart04_ExportImages
+    ReportPipeline_ThrowIfFailed
+
+    missingImages = GetMissingWeeklyChartImages(baseDate)
+    If Len(missingImages) > 0 Then
+        Err.Raise vbObjectError + 110, , "图表流水线运行后仍缺少以下推荐材料图片：" & _
+                  vbCrLf & missingImages
+    End If
+    If startedBatch Then ReportPipeline_EndBatch
+    Exit Sub
+
+EH:
+    Dim errorDescription As String
+    errorDescription = Err.Description
+    If startedBatch Then ReportPipeline_EndBatch
+    ReportPipeline_MsgBox "推荐材料图表准备失败" & vbCrLf & vbCrLf & _
+           "错误信息：" & errorDescription, vbCritical, "推荐材料图表检查"
+End Sub
+
 Public Sub Weekly02_GenerateReport()
     Dim t0 As Double: t0 = Timer
     
@@ -36,6 +82,7 @@ Public Sub Weekly02_GenerateReport()
     oldCalculation = Application.Calculation
     
     On Error GoTo EH
+    Report00_RequireValidConfiguration
     Application.ScreenUpdating = False
     Application.EnableEvents = False
     Application.DisplayAlerts = False
@@ -49,7 +96,13 @@ Public Sub Weekly02_GenerateReport()
     
     Dim baseDate As Date
     baseDate = GetBaseDate(wsCategory)
-    
+
+    Dim missingImages As String
+    missingImages = GetMissingWeeklyChartImages(baseDate)
+    If Len(missingImages) > 0 Then
+        Err.Raise vbObjectError + 111, , "缺少与基准日期一致的推荐材料图片：" & vbCrLf & missingImages
+    End If
+
     Dim wbOut As Workbook
     Set wbOut = Workbooks.Add(xlWBATWorksheet)
     
@@ -67,33 +120,40 @@ Public Sub Weekly02_GenerateReport()
     Set navHeaders = GetHeaderMap(wsNav)
     RequireHeaders navHeaders, Array("净值日期", "产品编号", "净值")
     
-    Dim lastProductRow As Long
-    lastProductRow = wsProduct.Cells(wsProduct.Rows.Count, HeaderColumn(productHeaders, "信托计划代码")).End(xlUp).Row
-    
-    Dim productCount As Long: productCount = 0
-    Dim r As Long
-    For r = 2 To lastProductRow
+    Dim productRows As Object
+    Set productRows = BuildProductRowMap(wsProduct, productHeaders)
+    Dim weeklyDefinitions As Collection
+    Set weeklyDefinitions = GetSortedEnabledWeeklyDefinitions()
+
+    Dim productCount As Long
+    Dim definition As Variant
+    For Each definition In weeklyDefinitions
         Dim productCode As String
-        productCode = Trim(CStr(wsProduct.Cells(r, HeaderColumn(productHeaders, "信托计划代码")).Value))
-        
         Dim productShort As String
-        productShort = Trim(CStr(wsProduct.Cells(r, HeaderColumn(productHeaders, "产品简称")).Value))
-        
-        If Len(productCode) > 0 And Len(productShort) > 0 Then
-            productCount = productCount + 1
-            
-            Dim wsOut As Worksheet
-            If productCount = 1 Then
-                Set wsOut = wbOut.Worksheets(1)
-            Else
-                Set wsOut = wbOut.Worksheets.Add(After:=wbOut.Worksheets(wbOut.Worksheets.Count))
-            End If
-            
-            wsOut.Name = UniqueSheetName(wbOut, SafeSheetName(productShort), wsOut)
-            BuildOneProductSheet wsOut, wsProduct, productHeaders, r, wsAsset, assetHeaders, _
-                                 wsNav, navHeaders, productCode, productShort, baseDate
+        Dim chartTheme As String
+        productCode = ConfigRowText(definition, "信托计划代码")
+        chartTheme = ConfigRowText(definition, "图表主题")
+        If Not productRows.Exists(productCode) Then
+            Err.Raise vbObjectError + 112, , "推荐材料产品未在产品要素登记：" & productCode
         End If
-    Next r
+
+        Dim productRow As Long
+        productRow = CLng(productRows(productCode))
+        productShort = Trim$(CStr(wsProduct.Cells(productRow, _
+                             HeaderColumn(productHeaders, "产品简称")).Value))
+        productCount = productCount + 1
+
+        Dim wsOut As Worksheet
+        If productCount = 1 Then
+            Set wsOut = wbOut.Worksheets(1)
+        Else
+            Set wsOut = wbOut.Worksheets.Add(After:=wbOut.Worksheets(wbOut.Worksheets.Count))
+        End If
+
+        wsOut.Name = UniqueSheetName(wbOut, SafeSheetName(productShort), wsOut)
+        BuildOneProductSheet wsOut, wsProduct, productHeaders, productRow, wsAsset, assetHeaders, _
+                             wsNav, navHeaders, productCode, productShort, chartTheme, baseDate
+    Next definition
     
     If productCount = 0 Then
         Err.Raise vbObjectError + 101, , "产品要素中未找到可生成的产品。"
@@ -138,6 +198,7 @@ Private Sub BuildOneProductSheet(ByVal wsOut As Worksheet, _
                                  ByVal navHeaders As Object, _
                                  ByVal productCode As String, _
                                  ByVal productShort As String, _
+                                 ByVal chartTheme As String, _
                                  ByVal baseDate As Date)
     PrepareSheetLayout wsOut
     
@@ -178,7 +239,7 @@ Private Sub BuildOneProductSheet(ByVal wsOut As Worksheet, _
     Dim chartRow As Long: chartRow = curRow
     wsOut.Range("B" & chartRow & ":E" & chartRow).Merge
     ApplyNormalStyle wsOut.Range("B" & chartRow & ":E" & chartRow)
-    InsertChartImage wsOut, productShort, chartRow
+    InsertChartImage wsOut, productShort, chartTheme, baseDate, chartRow
     
     Dim blankRow As Long: blankRow = chartRow + 1
     wsOut.Rows(blankRow).RowHeight = NORMAL_ROW_HEIGHT
@@ -483,18 +544,17 @@ Private Sub AddFlowLine(ByVal ws As Worksheet, _
     End With
 End Sub
 
-Private Sub InsertChartImage(ByVal ws As Worksheet, ByVal productShort As String, ByVal rowNo As Long)
+Private Sub InsertChartImage(ByVal ws As Worksheet, ByVal productShort As String, _
+                             ByVal chartTheme As String, ByVal baseDate As Date, _
+                             ByVal rowNo As Long)
     Dim chartPath As String
-    chartPath = FindLatestChartImage(productShort)
+    chartPath = WeeklyChartImagePath(productShort, chartTheme, baseDate)
     
     Dim area As Range
     Set area = ws.Range("B" & rowNo & ":E" & rowNo)
     
-    If Len(chartPath) = 0 Then
-        ws.Rows(rowNo).RowHeight = 90
-        area.Value = "未找到图表图片，请先运行图表图片导出步骤。"
-        area.Font.Color = RGB(128, 128, 128)
-        Exit Sub
+    If Not FileExists(chartPath) Then
+        Err.Raise vbObjectError + 113, , "未找到推荐材料图表图片：" & chartPath
     End If
     
     Dim pic As Shape
@@ -510,42 +570,135 @@ Private Sub InsertChartImage(ByVal ws As Worksheet, ByVal productShort As String
     pic.Placement = xlMove
 End Sub
 
-Private Function FindLatestChartImage(ByVal productShort As String) As String
-    Dim rootPath As String
-    rootPath = ThisWorkbook.Path & "\"
-    
-    Dim folderName As String
-    Dim latestKey As String
-    Dim latestFolder As String
-    
-    folderName = Dir(rootPath & "产品图表_*", vbDirectory)
-    Do While Len(folderName) > 0
-        If folderName <> "." And folderName <> ".." Then
-            If (GetAttr(rootPath & folderName) And vbDirectory) = vbDirectory Then
-                Dim key As String
-                key = Replace(folderName, "产品图表_", "")
-                If Len(key) = 8 And key > latestKey Then
-                    latestKey = key
-                    latestFolder = rootPath & folderName & "\"
+Private Function WeeklyChartImagePath(ByVal productShort As String, ByVal chartTheme As String, _
+                                      ByVal baseDate As Date) As String
+    WeeklyChartImagePath = ThisWorkbook.Path & "\产品图表_" & Format$(baseDate, "yyyymmdd") & _
+                           "\" & productShort & "_" & chartTheme & ".png"
+End Function
+
+Private Function GetMissingWeeklyChartImages(ByVal baseDate As Date) As String
+    Dim wsProduct As Worksheet
+    Set wsProduct = RequireSheet(ThisWorkbook, SHEET_PRODUCT_ELEMENT)
+    Dim headers As Object
+    Set headers = GetHeaderMap(wsProduct)
+    RequireHeaders headers, Array("信托计划代码", "产品简称")
+
+    Dim productRows As Object
+    Set productRows = BuildProductRowMap(wsProduct, headers)
+    Dim definitions As Collection
+    Set definitions = GetSortedEnabledWeeklyDefinitions()
+
+    Dim missing As String
+    Dim definition As Variant
+    For Each definition In definitions
+        Dim code As String
+        Dim themeName As String
+        code = ConfigRowText(definition, "信托计划代码")
+        themeName = ConfigRowText(definition, "图表主题")
+        If Not productRows.Exists(code) Then
+            missing = missing & code & "：产品要素中未登记" & vbCrLf
+        Else
+            Dim productShort As String
+            productShort = Trim$(CStr(wsProduct.Cells(CLng(productRows(code)), _
+                                      HeaderColumn(headers, "产品简称")).Value))
+            If Len(productShort) = 0 Then
+                missing = missing & code & "：缺少产品简称" & vbCrLf
+            Else
+                Dim imagePath As String
+                imagePath = WeeklyChartImagePath(productShort, themeName, baseDate)
+                If Not IsValidChartImage(imagePath) Then
+                    missing = missing & code & " / " & productShort & " / " & themeName & _
+                              "：" & imagePath & vbCrLf
                 End If
             End If
         End If
-        folderName = Dir()
-    Loop
-    
-    If Len(latestFolder) = 0 Then Exit Function
-    
-    Dim candidate As String
-    candidate = latestFolder & productShort & "_蓝.png"
-    If FileExists(candidate) Then
-        FindLatestChartImage = candidate
+    Next definition
+    GetMissingWeeklyChartImages = missing
+End Function
+
+Private Function IsValidChartImage(ByVal imagePath As String) As Boolean
+    On Error GoTo InvalidImage
+    If Not FileExists(imagePath) Then Exit Function
+    IsValidChartImage = (FileLen(imagePath) >= 3000)
+    Exit Function
+InvalidImage:
+    IsValidChartImage = False
+End Function
+
+Private Function BuildProductRowMap(ByVal wsProduct As Worksheet, ByVal headers As Object) As Object
+    Dim result As Object
+    Set result = CreateObject("Scripting.Dictionary")
+    result.CompareMode = vbTextCompare
+    Dim codeColumn As Long
+    codeColumn = HeaderColumn(headers, "信托计划代码")
+    Dim lastRow As Long
+    lastRow = wsProduct.Cells(wsProduct.Rows.Count, codeColumn).End(xlUp).Row
+    Dim r As Long
+    For r = 2 To lastRow
+        Dim code As String
+        code = Trim$(CStr(wsProduct.Cells(r, codeColumn).Value))
+        If Len(code) > 0 Then result(code) = r
+    Next r
+    Set BuildProductRowMap = result
+End Function
+
+Private Function GetSortedEnabledWeeklyDefinitions() As Collection
+    Dim source As Collection
+    Set source = ReportConfig_GetWeeklyRecommendationDefinitions()
+    Dim enabled As New Collection
+    Dim definition As Variant
+    For Each definition In source
+        If IsConfigEnabled(ConfigRowValue(definition, "是否启用")) Then enabled.Add definition
+    Next definition
+
+    Dim result As New Collection
+    If enabled.Count = 0 Then
+        Set GetSortedEnabledWeeklyDefinitions = result
         Exit Function
     End If
-    
-    candidate = latestFolder & productShort & "_红.png"
-    If FileExists(candidate) Then
-        FindLatestChartImage = candidate
+
+    Dim used() As Boolean
+    ReDim used(1 To enabled.Count)
+    Dim outputIndex As Long
+    For outputIndex = 1 To enabled.Count
+        Dim bestIndex As Long
+        Dim bestOrder As Long
+        Dim i As Long
+        bestIndex = 0
+        For i = 1 To enabled.Count
+            If Not used(i) Then
+                Dim candidateOrder As Long
+                candidateOrder = CLng(ConfigRowValue(enabled(i), "展示顺序"))
+                If bestIndex = 0 Or candidateOrder < bestOrder Then
+                    bestIndex = i
+                    bestOrder = candidateOrder
+                End If
+            End If
+        Next i
+        used(bestIndex) = True
+        result.Add enabled(bestIndex)
+    Next outputIndex
+    Set GetSortedEnabledWeeklyDefinitions = result
+End Function
+
+Private Function ConfigRowValue(ByVal row As Object, ByVal fieldName As String) As Variant
+    If row.Exists(fieldName) Then
+        ConfigRowValue = row(fieldName)
+    Else
+        ConfigRowValue = Empty
     End If
+End Function
+
+Private Function ConfigRowText(ByVal row As Object, ByVal fieldName As String) As String
+    If IsError(ConfigRowValue(row, fieldName)) Or IsNull(ConfigRowValue(row, fieldName)) Then Exit Function
+    ConfigRowText = Trim$(CStr(ConfigRowValue(row, fieldName)))
+End Function
+
+Private Function IsConfigEnabled(ByVal value As Variant) As Boolean
+    Dim textValue As String
+    textValue = UCase$(Trim$(CStr(value)))
+    IsConfigEnabled = (textValue = "是" Or textValue = "Y" Or textValue = "YES" Or _
+                       textValue = "1" Or textValue = "TRUE" Or textValue = "启用")
 End Function
 
 Private Sub ReadPerformanceMetrics(ByVal wsProduct As Worksheet, _

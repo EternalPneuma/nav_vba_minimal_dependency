@@ -44,13 +44,15 @@ Private Sub UserForm_Initialize()
 
     AddSplitButton "btnOnePageAll", "btnOnePageMenu", "一键运行一页通", _
                    14, 118, 570, 31, _
-                   Array("OnePage01_ExportChartData", "OnePage02_GenerateCharts", "OnePage03_ExportPptPdf"), _
-                   MENU_ONE_PAGE, "system", "生成一页通数据、图表和 PPT/PDF。"
+                   Array("OnePage00_RequireStaticReady", "Chart01_ImportNavDataCore", "OnePage00_RequireDataReady", _
+                         "OnePage01_ExportChartData", "OnePage02_GenerateCharts", "OnePage03_ExportPpt"), _
+                   MENU_ONE_PAGE, "system", "同步净值并生成两套一页通 PPT。"
 
     AddSplitButton "btnRecommendationAll", "btnRecommendationMenu", "一键生成推荐材料", _
                    14, 158, 570, 31, _
-                   Array("Weekly01_UpdateDependencies", "Weekly02_GenerateReport"), _
-                   MENU_RECOMMENDATION, "system", "更新依赖数据后生成推荐材料。"
+                   Array("Report00_RequireValidConfiguration", "Weekly01_UpdateDependencies", _
+                         "Weekly02_EnsureChartImagesReady", "Weekly02_GenerateReport"), _
+                   MENU_RECOMMENDATION, "system", "预检配置，按需补充图表后生成推荐材料。"
 
     AddSplitButton "btnTool", "btnToolMenu", "维护工具", _
                    14, 211, 570, 29, Array("__toggle_only__"), _
@@ -121,11 +123,13 @@ Private Sub BuildOnePageMenu()
     Set menuButtons = New Collection
     Set menuFrame = AddPopupFrame("popupOnePage", 14, 149, 570, 122)
 
-    AddMenuButton menuFrame, menuButtons, "menuOnePage0", "0. 补充净值（可选）", 7, 7, 554, 20, Array("OnePage00_CheckAndImportNavData"), "normal", "从工作簿源数据补充一页通产品的绘图净值。"
+    AddMenuButton menuFrame, menuButtons, "menuOnePage0", "0. 预检并同步净值", 7, 7, 554, 20, _
+                  Array("OnePage00_RequireStaticReady", "Chart01_ImportNavDataCore", "OnePage00_RequireDataReady"), _
+                  "normal", "按一页通配置从181同步绘图净值并检查同日数据。"
     AddSeparator menuFrame, "sepOnePage", 7, 32, 554
-    AddMenuButton menuFrame, menuButtons, "menuOnePage1", "1. 导出数据", 7, 39, 554, 20, Array("OnePage01_ExportChartData"), "normal", "导出一页通图表数据。"
-    AddMenuButton menuFrame, menuButtons, "menuOnePage2", "2. 生成图表", 7, 61, 554, 20, Array("OnePage02_GenerateCharts"), "normal", "生成一页通图表。"
-    AddMenuButton menuFrame, menuButtons, "menuOnePage3", "3. 导出 PPT/PDF", 7, 83, 554, 20, Array("OnePage03_ExportPptPdf"), "normal", "生成一页通 PPT 和 PDF。"
+    AddMenuButton menuFrame, menuButtons, "menuOnePage1", "1. 导出数据", 7, 39, 554, 20, Array("OnePage01_ExportChartData"), "normal", "导出一页通共享图表数据。"
+    AddMenuButton menuFrame, menuButtons, "menuOnePage2", "2. 生成并验证图表", 7, 61, 554, 20, Array("OnePage02_GenerateCharts"), "normal", "保存、重开并验证一页通图表。"
+    AddMenuButton menuFrame, menuButtons, "menuOnePage3", "3. 导出 PPT", 7, 83, 554, 20, Array("OnePage03_ExportPpt"), "normal", "同时生成全部启用的一页通 PPT。"
 
     RegisterMenu MENU_ONE_PAGE, menuFrame, menuButtons
 End Sub
@@ -134,10 +138,11 @@ Private Sub BuildRecommendationMenu()
     Dim menuFrame As MSForms.Frame
     Dim menuButtons As Collection
     Set menuButtons = New Collection
-    Set menuFrame = AddPopupFrame("popupRecommendation", 14, 189, 570, 57)
+    Set menuFrame = AddPopupFrame("popupRecommendation", 14, 189, 570, 79)
 
     AddMenuButton menuFrame, menuButtons, "menuRecommendation1", "1. 更新依赖", 7, 7, 554, 20, Array("Weekly01_UpdateDependencies"), "normal", "更新推荐材料所需的规模和收益率数据。"
-    AddMenuButton menuFrame, menuButtons, "menuRecommendation2", "2. 生成材料", 7, 29, 554, 20, Array("Weekly02_GenerateReport"), "normal", "使用已更新的依赖数据生成推荐材料。"
+    AddMenuButton menuFrame, menuButtons, "menuRecommendation2", "2. 检查并补充图表", 7, 29, 554, 20, Array("Weekly02_EnsureChartImagesReady"), "normal", "图片齐全时跳过，否则运行完整图表流水线。"
+    AddMenuButton menuFrame, menuButtons, "menuRecommendation3", "3. 生成材料", 7, 51, 554, 20, Array("Weekly02_GenerateReport"), "normal", "按推荐材料产品配置生成正式材料。"
 
     RegisterMenu MENU_RECOMMENDATION, menuFrame, menuButtons
 End Sub
@@ -258,8 +263,6 @@ Public Sub RunPanelAction(ByVal actionTitle As String, ByVal macroNames As Varia
         Exit Sub
     End If
 
-    Dim runOnePagePrep As Boolean
-    If Not PrepareOnePageIfNeeded(macroNames, runOnePagePrep) Then Exit Sub
     If Not ConfirmPanelAction(actionTitle, macroNames) Then Exit Sub
 
     Dim isBatchMode As Boolean
@@ -283,14 +286,6 @@ Public Sub RunPanelAction(ByVal actionTitle As String, ByVal macroNames As Varia
     Application.ScreenUpdating = False
     Application.EnableEvents = False
     Application.DisplayAlerts = False
-
-    If runOnePagePrep Then
-        currentStepTitle = "补充一页通净值"
-        SetStatus "运行中：准备，" & currentStepTitle, "running"
-        DoEvents
-        RunMacroByName "OnePage00_CheckAndImportNavData"
-        If isBatchMode Then ReportPipeline_ThrowIfFailed
-    End If
 
     Dim i As Long
     Dim stepNumber As Long
@@ -367,34 +362,6 @@ Private Function ConfirmPanelAction(ByVal actionTitle As String, ByVal macroName
     End If
 
     ConfirmPanelAction = True
-End Function
-
-Private Function PrepareOnePageIfNeeded(ByVal macroNames As Variant, ByRef runPrep As Boolean) As Boolean
-    PrepareOnePageIfNeeded = True
-    runPrep = False
-
-    If UBound(macroNames) <= LBound(macroNames) Then Exit Function
-    If CStr(macroNames(LBound(macroNames))) <> "OnePage01_ExportChartData" Then Exit Function
-
-    Dim sourceDate As Double
-    Dim targetDate As Double
-    sourceDate = GetLatestSheetDate("上层产品净值数据(181)", "日期")
-    targetDate = GetLatestSheetDate("绘图净值数据", "净值日期")
-    If sourceDate <= 0 Or targetDate <= 0 Or sourceDate <= targetDate Then Exit Function
-
-    Dim response As VbMsgBoxResult
-    response = MsgBox("工作簿中的源净值日期晚于绘图净值日期。" & vbCrLf & vbCrLf & _
-                      "源净值截止：" & Format$(CDate(sourceDate), "yyyy-mm-dd") & vbCrLf & _
-                      "绘图净值截止：" & Format$(CDate(targetDate), "yyyy-mm-dd") & vbCrLf & vbCrLf & _
-                      "是否先运行“补充净值”，然后继续一页通流程？" & vbCrLf & _
-                      "选择“否”将直接继续；选择“取消”将停止。", _
-                      vbYesNoCancel + vbExclamation + vbDefaultButton1, "一页通数据检查")
-
-    If response = vbCancel Then
-        PrepareOnePageIfNeeded = False
-    ElseIf response = vbYes Then
-        runPrep = True
-    End If
 End Function
 
 Private Sub ToggleMenu(ByVal menuKey As String)
@@ -588,11 +555,14 @@ Private Function MacroDisplayName(ByVal macroName As String) As String
         Case "Chart03_GenerateCharts": MacroDisplayName = "生成产品图表"
         Case "Chart04_ExportImages": MacroDisplayName = "导出产品图片"
         Case "Data04_ExportDisplayReport": MacroDisplayName = "输出展示报表"
-        Case "OnePage00_CheckAndImportNavData": MacroDisplayName = "补充净值"
+        Case "OnePage00_RequireStaticReady": MacroDisplayName = "预检一页通配置"
+        Case "Chart01_ImportNavDataCore": MacroDisplayName = "同步一页通净值"
+        Case "OnePage00_RequireDataReady": MacroDisplayName = "检查一页通数据"
         Case "OnePage01_ExportChartData": MacroDisplayName = "导出一页通数据"
-        Case "OnePage02_GenerateCharts": MacroDisplayName = "生成一页通图表"
-        Case "OnePage03_ExportPptPdf": MacroDisplayName = "导出一页通 PPT/PDF"
+        Case "OnePage02_GenerateCharts": MacroDisplayName = "生成并验证一页通图表"
+        Case "OnePage03_ExportPpt", "OnePage03_ExportPptPdf": MacroDisplayName = "导出一页通 PPT"
         Case "Weekly01_UpdateDependencies": MacroDisplayName = "更新推荐材料依赖"
+        Case "Weekly02_EnsureChartImagesReady": MacroDisplayName = "检查并补充推荐材料图表"
         Case "Weekly02_GenerateReport": MacroDisplayName = "生成推荐材料"
         Case "Tool01_CleanDuplicateData": MacroDisplayName = "绘图去重"
         Case "Tool02_DeleteByProductId": MacroDisplayName = "删除产品"
@@ -626,7 +596,7 @@ Private Sub ShowOperationGuide()
                 "可以独立启动，但可能复用已有净值数据；建议先更新产品业绩展示。" & vbCrLf & _
                 "“补充净值”是可选前置任务，一键流程默认运行步骤 1-3。" & vbCrLf & vbCrLf & _
                 "三、推荐材料" & vbCrLf & _
-                "先更新依赖，再生成材料。" & vbCrLf & vbCrLf & _
+                "产品、顺序和主题维护“报表配置”；一键流程会按需补充基准日期图表。" & vbCrLf & vbCrLf & _
                 "四、运行前检查" & vbCrLf & _
                 "保存当前工作簿，确认源文件位于同级目录，并关闭已打开的输出文件。"
 

@@ -1,5 +1,6 @@
-# Excel
+# Office
 *.xlsx
+*.pptx
 ~$*
 *备份.xlsm
 

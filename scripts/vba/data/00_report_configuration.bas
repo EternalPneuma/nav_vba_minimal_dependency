@@ -4,6 +4,7 @@ Option Explicit
 
 Private Const SHEET_PRODUCT_CATEGORY As String = "产品分类"
 Private Const SHEET_PRODUCT_INFO As String = "产品信息"
+Private Const SHEET_PRODUCT_ELEMENT As String = "产品要素"
 Private Const SHEET_REPORT_CONFIG As String = "报表配置"
 Private Const SHEET_CONFIG_GUIDE As String = "配置说明"
 
@@ -11,6 +12,8 @@ Private Const TABLE_CATEGORIES As String = "tblReportCategories"
 Private Const TABLE_GROUPS As String = "tblReportGroups"
 Private Const TABLE_SCHEMES As String = "tblOutputSchemes"
 Private Const TABLE_CHARTS As String = "tblReportCharts"
+Private Const TABLE_WEEKLY_PRODUCTS As String = "tblWeeklyRecommendationProducts"
+Private Const TABLE_ONE_PAGE_VERSIONS As String = "tblOnePageVersions"
 
 Private Const COL_EXPORT_ENABLED As String = "是否导出"
 Private Const COL_CATEGORY As String = "分类"
@@ -161,7 +164,43 @@ Public Function ReportConfig_GetRequiredChartCodeSet() As Object
         Next r
     End If
 
+    Dim weeklyTable As ListObject
+    Set weeklyTable = ws.ListObjects(TABLE_WEEKLY_PRODUCTS)
+    If Not weeklyTable.DataBodyRange Is Nothing Then
+        For r = 1 To weeklyTable.DataBodyRange.Rows.Count
+            trustCode = TableText(weeklyTable, r, "信托计划代码")
+            If IsEnabledValue(TableValue(weeklyTable, r, "是否启用")) And Len(trustCode) > 0 Then
+                result(trustCode) = True
+            End If
+        Next r
+    End If
+
     Set ReportConfig_GetRequiredChartCodeSet = result
+End Function
+
+' 返回所有需要同步到绘图净值数据的产品代码，包含普通图表和一页通产品。
+Public Function ReportConfig_GetRequiredNavImportCodeSet() As Object
+    Dim result As Object
+    Set result = ReportConfig_GetRequiredChartCodeSet()
+
+    Dim definitions As Collection
+    Set definitions = ReportConfig_GetOnePageDefinitions()
+
+    Dim definition As Object
+    Dim fieldName As Variant
+    For Each definition In definitions
+        If ConfigDefinitionEnabled(definition) Then
+            For Each fieldName In Array("基准产品代码", "顶层产品1代码", "顶层产品2代码")
+                If definition.Exists(CStr(fieldName)) Then
+                    Dim trustCode As String
+                    trustCode = NormalizeText(definition(CStr(fieldName)))
+                    If Len(trustCode) > 0 Then result(trustCode) = True
+                End If
+            Next fieldName
+        End If
+    Next definition
+
+    Set ReportConfig_GetRequiredNavImportCodeSet = result
 End Function
 
 ' 返回 Dictionary(信托计划代码 -> |红|、|蓝| 或 |红|蓝|)。
@@ -194,12 +233,18 @@ Public Function ReportConfig_GetChartThemeMap() As Object
             categoryName = TableText(chartTable, r, "分类")
             trustCode = TableText(chartTable, r, "信托计划代码")
             If categoryThemes.Exists(categoryName) And Len(trustCode) > 0 Then
-                Dim themeToken As String
-                themeToken = "|" & CStr(categoryThemes(categoryName)) & "|"
-                If Not result.Exists(trustCode) Then result.Add trustCode, "|"
-                If InStr(1, CStr(result(trustCode)), themeToken, vbTextCompare) = 0 Then
-                    result(trustCode) = CStr(result(trustCode)) & CStr(categoryThemes(categoryName)) & "|"
-                End If
+                AddChartTheme result, trustCode, CStr(categoryThemes(categoryName))
+            End If
+        Next r
+    End If
+
+    Dim weeklyTable As ListObject
+    Set weeklyTable = ws.ListObjects(TABLE_WEEKLY_PRODUCTS)
+    If Not weeklyTable.DataBodyRange Is Nothing Then
+        For r = 1 To weeklyTable.DataBodyRange.Rows.Count
+            trustCode = TableText(weeklyTable, r, "信托计划代码")
+            If IsEnabledValue(TableValue(weeklyTable, r, "是否启用")) And Len(trustCode) > 0 Then
+                AddChartTheme result, trustCode, TableText(weeklyTable, r, "图表主题")
             End If
         Next r
     End If
@@ -224,40 +269,77 @@ Public Function ReportConfig_GetChartDefinitions() As Collection
     Set ReportConfig_GetChartDefinitions = ReadConfigurationRows(TABLE_CHARTS)
 End Function
 
+Public Function ReportConfig_GetWeeklyRecommendationDefinitions() As Collection
+    Set ReportConfig_GetWeeklyRecommendationDefinitions = ReadConfigurationRows(TABLE_WEEKLY_PRODUCTS)
+End Function
+
+' 一页通配置是可选上下文，不参与普通周报预检。
+Public Function ReportConfig_GetOnePageDefinitions() As Collection
+    Dim result As New Collection
+    Dim ws As Worksheet
+    Set ws = GetWorksheetIfExists(ThisWorkbook, SHEET_REPORT_CONFIG)
+    If ws Is Nothing Then
+        Set ReportConfig_GetOnePageDefinitions = result
+        Exit Function
+    End If
+
+    If Not TableExists(ws, TABLE_ONE_PAGE_VERSIONS) Then
+        Set ReportConfig_GetOnePageDefinitions = result
+        Exit Function
+    End If
+
+    Set ReportConfig_GetOnePageDefinitions = ReadConfigurationRows(TABLE_ONE_PAGE_VERSIONS)
+End Function
+
+Public Function ReportConfig_HasOnePageConfiguration() As Boolean
+    Dim ws As Worksheet
+    Set ws = GetWorksheetIfExists(ThisWorkbook, SHEET_REPORT_CONFIG)
+    If ws Is Nothing Then Exit Function
+    ReportConfig_HasOnePageConfiguration = TableExists(ws, TABLE_ONE_PAGE_VERSIONS)
+End Function
+
 Public Function ReportConfig_Validate(ByRef validationErrors As String) As Boolean
     validationErrors = vbNullString
 
     Dim wsCategory As Worksheet
     Dim wsInfo As Worksheet
+    Dim wsProductElement As Worksheet
     Dim wsConfig As Worksheet
     Set wsCategory = GetWorksheetIfExists(ThisWorkbook, SHEET_PRODUCT_CATEGORY)
     Set wsInfo = GetWorksheetIfExists(ThisWorkbook, SHEET_PRODUCT_INFO)
+    Set wsProductElement = GetWorksheetIfExists(ThisWorkbook, SHEET_PRODUCT_ELEMENT)
     Set wsConfig = GetWorksheetIfExists(ThisWorkbook, SHEET_REPORT_CONFIG)
 
     If wsCategory Is Nothing Then AppendValidationError validationErrors, "缺少工作表：" & SHEET_PRODUCT_CATEGORY
     If wsInfo Is Nothing Then AppendValidationError validationErrors, "缺少工作表：" & SHEET_PRODUCT_INFO
+    If wsProductElement Is Nothing Then AppendValidationError validationErrors, "缺少工作表：" & SHEET_PRODUCT_ELEMENT
     If wsConfig Is Nothing Then AppendValidationError validationErrors, "缺少工作表：" & SHEET_REPORT_CONFIG & "（请先运行 Report00_MigrateConfiguration）"
-    If wsCategory Is Nothing Or wsInfo Is Nothing Or wsConfig Is Nothing Then Exit Function
+    If wsCategory Is Nothing Or wsInfo Is Nothing Or wsProductElement Is Nothing Or wsConfig Is Nothing Then Exit Function
 
     Dim categoryTable As ListObject
     Dim groupTable As ListObject
     Dim schemeTable As ListObject
     Dim chartTable As ListObject
+    Dim weeklyTable As ListObject
     Set categoryTable = GetTableIfExists(wsConfig, TABLE_CATEGORIES)
     Set groupTable = GetTableIfExists(wsConfig, TABLE_GROUPS)
     Set schemeTable = GetTableIfExists(wsConfig, TABLE_SCHEMES)
     Set chartTable = GetTableIfExists(wsConfig, TABLE_CHARTS)
+    Set weeklyTable = GetTableIfExists(wsConfig, TABLE_WEEKLY_PRODUCTS)
 
     If categoryTable Is Nothing Then AppendValidationError validationErrors, "报表配置缺少表格：" & TABLE_CATEGORIES
     If groupTable Is Nothing Then AppendValidationError validationErrors, "报表配置缺少表格：" & TABLE_GROUPS
     If schemeTable Is Nothing Then AppendValidationError validationErrors, "报表配置缺少表格：" & TABLE_SCHEMES
     If chartTable Is Nothing Then AppendValidationError validationErrors, "报表配置缺少表格：" & TABLE_CHARTS
-    If categoryTable Is Nothing Or groupTable Is Nothing Or schemeTable Is Nothing Or chartTable Is Nothing Then Exit Function
+    If weeklyTable Is Nothing Then AppendValidationError validationErrors, "报表配置缺少表格：" & TABLE_WEEKLY_PRODUCTS
+    If categoryTable Is Nothing Or groupTable Is Nothing Or schemeTable Is Nothing Or _
+       chartTable Is Nothing Or weeklyTable Is Nothing Then Exit Function
 
     RequireTableHeaders categoryTable, Array("分类", "是否启用", "工作表名称", "报表主标题", "页内标题", "视觉主题", "工作表顺序"), validationErrors
     RequireTableHeaders groupTable, Array("分类", "产品系列", "展示分组", "分组标题", "分组顺序", "输出字段方案"), validationErrors
     RequireTableHeaders schemeTable, Array("方案名称", "字段1", "字段1标题", "字段2", "字段2标题", "字段3", "字段3标题", "字段4", "字段4标题", "字段5", "字段5标题"), validationErrors
     RequireTableHeaders chartTable, Array("分类", "位置序号", "信托计划代码", "图表类型", "是否必需"), validationErrors
+    RequireTableHeaders weeklyTable, Array("信托计划代码", "是否启用", "展示顺序", "图表主题"), validationErrors
     If Len(validationErrors) > 0 Then Exit Function
 
     Dim categoryDefinitions As Object
@@ -276,6 +358,7 @@ Public Function ReportConfig_Validate(ByRef validationErrors As String) As Boole
     ValidateGroupTable groupTable, categoryDefinitions, schemeDefinitions, groupDefinitions, validationErrors
     ValidateProductAssignments wsCategory, categoryDefinitions, groupDefinitions, validationErrors
     ValidateChartTable chartTable, categoryDefinitions, productInfoCodes, validationErrors
+    ValidateWeeklyRecommendationTable weeklyTable, wsProductElement, productInfoCodes, validationErrors
 
     ReportConfig_Validate = (Len(validationErrors) = 0)
 End Function
@@ -325,6 +408,14 @@ Private Sub EnsureReportConfigurationSheet()
            TableExists(ws, TABLE_GROUPS) And _
            TableExists(ws, TABLE_SCHEMES) And _
            TableExists(ws, TABLE_CHARTS) Then
+            If Not TableExists(ws, TABLE_WEEKLY_PRODUCTS) Then
+                WriteWeeklyRecommendationConfiguration ws, NextConfigurationTitleRow(ws)
+            End If
+            If Not TableExists(ws, TABLE_ONE_PAGE_VERSIONS) Then
+                WriteOnePageConfiguration ws, NextConfigurationTitleRow(ws)
+            End If
+            WriteValidationLists ws
+            ApplyConfigurationValidation ws
             Exit Sub
         End If
         Err.Raise vbObjectError + 6001, , "已存在“报表配置”工作表，但配置表格不完整。为避免覆盖业务配置，请先人工检查或删除该工作表后重试。"
@@ -338,6 +429,8 @@ Private Sub EnsureReportConfigurationSheet()
     WriteGroupConfiguration ws, 10
     WriteSchemeConfiguration ws, 27
     WriteChartConfiguration ws, 38
+    WriteWeeklyRecommendationConfiguration ws, 54
+    WriteOnePageConfiguration ws, NextConfigurationTitleRow(ws)
     WriteValidationLists ws
     ApplyConfigurationValidation ws
 
@@ -412,6 +505,78 @@ Private Sub WriteChartConfiguration(ByVal ws As Worksheet, ByVal titleRow As Lon
         Array("恒丰", 2, "PH3400", "组合图", "是"))
     CreateConfigTable ws, titleRow, "四、图表位置配置", headers, rows, TABLE_CHARTS
 End Sub
+
+Private Sub WriteWeeklyRecommendationConfiguration(ByVal ws As Worksheet, ByVal titleRow As Long)
+    ws.Cells(titleRow, 1).Value = "五、推荐材料产品配置"
+    ws.Cells(titleRow, 1).Font.Bold = True
+    ws.Cells(titleRow, 1).Font.Size = 12
+
+    Dim headers As Variant
+    headers = Array("信托计划代码", "是否启用", "展示顺序", "图表主题")
+    Dim c As Long
+    For c = LBound(headers) To UBound(headers)
+        ws.Cells(titleRow + 1, c + 1).Value = headers(c)
+    Next c
+
+    Dim sourceSheet As Worksheet
+    Set sourceSheet = ThisWorkbook.Worksheets(SHEET_PRODUCT_ELEMENT)
+    Dim sourceHeaders As Object
+    Set sourceHeaders = BuildHeaderMap(sourceSheet, 1)
+    If Not sourceHeaders.Exists(COL_TRUST_CODE) Then
+        Err.Raise vbObjectError + 6004, , SHEET_PRODUCT_ELEMENT & "缺少字段：" & COL_TRUST_CODE
+    End If
+
+    Dim outputRow As Long
+    Dim displayOrder As Long
+    outputRow = titleRow + 2
+    Dim r As Long
+    For r = 2 To LastUsedRow(sourceSheet)
+        Dim trustCode As String
+        trustCode = NormalizeText(sourceSheet.Cells(r, CLng(sourceHeaders(COL_TRUST_CODE))).Value)
+        If Len(trustCode) > 0 Then
+            displayOrder = displayOrder + 1
+            ws.Cells(outputRow, 1).Value = trustCode
+            ws.Cells(outputRow, 2).Value = "是"
+            ws.Cells(outputRow, 3).Value = displayOrder
+            ws.Cells(outputRow, 4).Value = "蓝"
+            outputRow = outputRow + 1
+        End If
+    Next r
+    If displayOrder = 0 Then
+        ws.Cells(outputRow, 1).Value = vbNullString
+        outputRow = outputRow + 1
+    End If
+
+    Dim table As ListObject
+    Set table = ws.ListObjects.Add(xlSrcRange, _
+                ws.Range(ws.Cells(titleRow + 1, 1), ws.Cells(outputRow - 1, 4)), , xlYes)
+    table.Name = TABLE_WEEKLY_PRODUCTS
+    table.TableStyle = "TableStyleMedium2"
+End Sub
+
+Private Sub WriteOnePageConfiguration(ByVal ws As Worksheet, ByVal titleRow As Long)
+    Dim headers As Variant
+    Dim rows As Variant
+    headers = Array("版本名称", "是否启用", "输出顺序", "模板文件", "输出文件前缀", _
+                    "基准产品代码", "顶层产品1代码", "顶层产品2代码")
+    rows = Array( _
+        Array("交鑫致远6月", "是", 1, "assets\产品一页通-交鑫致远-模板.pptx", _
+              "产品一页通-交鑫致远6月-", "OA4400", "P83600", "P83800"), _
+        Array("交鑫致远12月", "是", 2, "assets\产品一页通-交鑫致远-模板-12月.pptx", _
+              "产品一页通-交鑫致远12月-", "OA4400", "Q87500", "Q87900"))
+    CreateConfigTable ws, titleRow, "六、一页通版本配置", headers, rows, TABLE_ONE_PAGE_VERSIONS
+End Sub
+
+Private Function NextConfigurationTitleRow(ByVal ws As Worksheet) As Long
+    Dim lastTableRow As Long
+    Dim table As ListObject
+    For Each table In ws.ListObjects
+        If table.Range.Row + table.Range.Rows.Count - 1 > lastTableRow Then
+            lastTableRow = table.Range.Row + table.Range.Rows.Count - 1
+        End If
+    Next table
+    NextConfigurationTitleRow = lastTableRow + 2
+End Function
 
 Private Sub CreateConfigTable(ByVal ws As Worksheet, ByVal titleRow As Long, ByVal titleText As String, _
                               ByVal headers As Variant, ByVal rows As Variant, ByVal tableName As String)
@@ -491,6 +656,11 @@ Private Sub ApplyConfigurationValidation(ByVal ws As Worksheet)
     ApplyListValidation ws.ListObjects(TABLE_CATEGORIES).ListColumns("视觉主题").DataBodyRange, "=ReportThemeValues"
     ApplyListValidation ws.ListObjects(TABLE_CHARTS).ListColumns("图表类型").DataBodyRange, "=ReportChartTypeValues"
     ApplyListValidation ws.ListObjects(TABLE_CHARTS).ListColumns("是否必需").DataBodyRange, "=ReportBooleanValues"
+    ApplyListValidation ws.ListObjects(TABLE_WEEKLY_PRODUCTS).ListColumns("是否启用").DataBodyRange, "=ReportBooleanValues"
+    ApplyListValidation ws.ListObjects(TABLE_WEEKLY_PRODUCTS).ListColumns("图表主题").DataBodyRange, "=ReportThemeValues"
+    If TableExists(ws, TABLE_ONE_PAGE_VERSIONS) Then
+        ApplyListValidation ws.ListObjects(TABLE_ONE_PAGE_VERSIONS).ListColumns("是否启用").DataBodyRange, "=ReportBooleanValues"
+    End If
 
     Dim schemeTable As ListObject
     Set schemeTable = ws.ListObjects(TABLE_SCHEMES)
@@ -533,7 +703,13 @@ End Sub
 Private Sub EnsureConfigurationGuideSheet()
     Dim ws As Worksheet
     Set ws = GetWorksheetIfExists(ThisWorkbook, SHEET_CONFIG_GUIDE)
-    If Not ws Is Nothing Then Exit Sub
+    If Not ws Is Nothing Then
+        ws.Range("A11").Value = "9. 推荐材料：在报表配置的推荐材料产品配置中维护启停、顺序和图表主题。"
+        ws.Range("A12").Value = "10. 一页通：在一页通版本配置中维护启停、模板、输出名称和三个产品代码。"
+        ws.Range("A11:A12").WrapText = True
+        ws.Range("A11:A12").Rows.AutoFit
+        Exit Sub
+    End If
 
     Set ws = ThisWorkbook.Worksheets.Add(After:=ThisWorkbook.Worksheets(ThisWorkbook.Worksheets.Count))
     ws.Name = SHEET_CONFIG_GUIDE
@@ -552,7 +728,9 @@ Private Sub EnsureConfigurationGuideSheet()
         "5. 图表：使用信托计划代码和位置序号，不要填写产品名称或单元格地址。", _
         "6. 开放日：推算结果先进入“开放日待确认”，确认后才能写入开放日台账。", _
         "7. 正式输出：必需图表必须与报表基准日期一致；缺图时一键流程停止。", _
-        "8. 修改配置后先运行 Report00_ValidateConfiguration，再运行正式流程。")
+        "8. 推荐材料：在推荐材料产品配置中维护启停、顺序和图表主题。", _
+        "9. 修改配置后先运行 Report00_ValidateConfiguration，再运行正式流程。", _
+        "10. 一页通：版本配置独立预检，不影响普通周报；模板路径必须使用工作簿目录下的相对路径。")
 
     Dim i As Long
     For i = LBound(guideLines) To UBound(guideLines)
@@ -847,6 +1025,87 @@ Private Sub ValidateChartTable(ByVal table As ListObject, ByVal categoryDefiniti
     Next r
 End Sub
 
+Private Sub ValidateWeeklyRecommendationTable(ByVal table As ListObject, _
+                                              ByVal wsProductElement As Worksheet, _
+                                              ByVal productInfoCodes As Object, _
+                                              ByRef validationErrors As String)
+    If table.DataBodyRange Is Nothing Then
+        AppendValidationError validationErrors, "推荐材料产品配置没有数据。"
+        Exit Sub
+    End If
+
+    Dim elementHeaders As Object
+    Set elementHeaders = BuildHeaderMap(wsProductElement, 1)
+    If Not elementHeaders.Exists(COL_TRUST_CODE) Or Not elementHeaders.Exists("产品简称") Then
+        AppendValidationError validationErrors, SHEET_PRODUCT_ELEMENT & "缺少信托计划代码或产品简称。"
+        Exit Sub
+    End If
+
+    Dim elementShortNames As Object
+    Set elementShortNames = CreateTextDictionary()
+    Dim sourceRow As Long
+    For sourceRow = 2 To LastUsedRow(wsProductElement)
+        Dim sourceCode As String
+        sourceCode = NormalizeText(wsProductElement.Cells(sourceRow, CLng(elementHeaders(COL_TRUST_CODE))).Value)
+        If Len(sourceCode) > 0 Then
+            elementShortNames(sourceCode) = NormalizeText(wsProductElement.Cells(sourceRow, _
+                                                   CLng(elementHeaders("产品简称"))).Value)
+        End If
+    Next sourceRow
+
+    Dim seenCodes As Object
+    Dim seenOrders As Object
+    Set seenCodes = CreateTextDictionary()
+    Set seenOrders = CreateTextDictionary()
+
+    Dim r As Long
+    For r = 1 To table.DataBodyRange.Rows.Count
+        Dim code As String
+        Dim enabledText As String
+        Dim themeName As String
+        code = TableText(table, r, "信托计划代码")
+        enabledText = TableText(table, r, "是否启用")
+        themeName = TableText(table, r, "图表主题")
+
+        If Len(code) = 0 Then
+            AppendValidationError validationErrors, "推荐材料产品配置第" & r & "行缺少信托计划代码。"
+        ElseIf seenCodes.Exists(code) Then
+            AppendValidationError validationErrors, "推荐材料产品配置重复：" & code
+        Else
+            seenCodes.Add code, True
+        End If
+
+        If Len(enabledText) > 0 And Not IsRecognizedBoolean(enabledText) Then
+            AppendValidationError validationErrors, "推荐材料产品“" & code & "”的是否启用值无效：" & enabledText
+        End If
+
+        If IsEnabledValue(enabledText) Then
+            If Not productInfoCodes.Exists(code) Then
+                AppendValidationError validationErrors, "推荐材料产品未在产品信息登记：" & code
+            End If
+            If Not elementShortNames.Exists(code) Then
+                AppendValidationError validationErrors, "推荐材料产品未在产品要素登记：" & code
+            ElseIf Len(CStr(elementShortNames(code))) = 0 Then
+                AppendValidationError validationErrors, "推荐材料产品缺少产品简称：" & code
+            End If
+            If themeName <> "红" And themeName <> "蓝" Then
+                AppendValidationError validationErrors, "推荐材料产品“" & code & "”的图表主题只允许“红”或“蓝”。"
+            End If
+            If Not IsPositiveLong(TableValue(table, r, "展示顺序")) Then
+                AppendValidationError validationErrors, "推荐材料产品“" & code & "”的展示顺序必须为正整数。"
+            Else
+                Dim orderKey As String
+                orderKey = CStr(CLng(TableValue(table, r, "展示顺序")))
+                If seenOrders.Exists(orderKey) Then
+                    AppendValidationError validationErrors, "推荐材料展示顺序重复：" & orderKey
+                Else
+                    seenOrders.Add orderKey, True
+                End If
+            End If
+        End If
+    Next r
+End Sub
+
 Private Function LoadProductInfoCodes(ByVal ws As Worksheet, ByRef validationErrors As String) As Object
     Dim result As Object
     Set result = CreateTextDictionary()
@@ -934,6 +1193,12 @@ Private Function TableText(ByVal table As ListObject, ByVal bodyRow As Long, ByV
     TableText = NormalizeText(TableValue(table, bodyRow, columnName))
 End Function
 
+Private Function ConfigDefinitionEnabled(ByVal definition As Object) As Boolean
+    If definition Is Nothing Then Exit Function
+    If Not definition.Exists("是否启用") Then Exit Function
+    ConfigDefinitionEnabled = IsEnabledValue(definition("是否启用"))
+End Function
+
 Private Function IsEnabledValue(ByVal value As Variant) As Boolean
     Dim textValue As String
     textValue = UCase$(NormalizeText(value))
@@ -970,6 +1235,15 @@ Private Function IsValidWorksheetName(ByVal sheetName As String) As Boolean
 
     IsValidWorksheetName = True
 End Function
+
+Private Sub AddChartTheme(ByVal themeMap As Object, ByVal trustCode As String, ByVal themeName As String)
+    Dim themeToken As String
+    themeToken = "|" & themeName & "|"
+    If Not themeMap.Exists(trustCode) Then themeMap.Add trustCode, "|"
+    If InStr(1, CStr(themeMap(trustCode)), themeToken, vbTextCompare) = 0 Then
+        themeMap(trustCode) = CStr(themeMap(trustCode)) & themeName & "|"
+    End If
+End Sub
 
 Private Sub AddAllowedField(ByVal fields As Object, ByVal fieldName As String)
     If Not fields.Exists(fieldName) Then fields.Add fieldName, True

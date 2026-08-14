@@ -20,6 +20,7 @@ Private Const COL_REITS_CLOSE As String = "REITs收盘"
 Private Const COL_REITS_ANNUALIZED_RETURN As String = "REITs期间年化收益率"
 
 Private Const DEFAULT_INCEPTION_NAV As Double = 1#
+Private Const TEMP_OUTPUT_SUFFIX As String = "-产品一页通-临时.xlsx"
 
 Public Sub OnePage01_ExportChartData()
     Dim appCalc As XlCalculation
@@ -41,6 +42,9 @@ Public Sub OnePage01_ExportChartData()
     Application.DisplayAlerts = False
     Application.Calculation = xlCalculationManual
 
+    currentStep = "执行一页通数据预检"
+    OnePage_RequireDataReady
+
     currentStep = "读取净值数据sheet"
     Dim wsNav As Worksheet
     Set wsNav = FindWorksheetByNames(Array(SHEET_NAV_DATA, "绘图净值数据", "上层产品净值数据(181)"))
@@ -53,24 +57,26 @@ Public Sub OnePage01_ExportChartData()
     Set wsProduct = ThisWorkbook.Worksheets(SHEET_PRODUCT_INFO)
 
     Dim targetProducts As Variant
-    targetProducts = Array("OA4400", "P83600", "P83800")
+    targetProducts = OnePage_GetTargetProductCodes()
 
     currentStep = "读取产品信息：产品简称和成立日"
     Dim productInfo As Object
     Set productInfo = BuildProductInfoLookup(wsProduct, targetProducts)
 
+    Dim baselineDate As Date
+    baselineDate = OnePage_GetBaselineDate()
+    If baselineDate = 0 Then
+        Err.Raise vbObjectError + 5102, , "未找到一页通有效基准日期。"
+    End If
+
     currentStep = "读取净值数据：目标产品历史净值"
     Dim navGroups As Object
-    Dim maxNavDate As Date
-    Set navGroups = BuildNavGroups(wsNav, targetProducts, maxNavDate)
-
-    If maxNavDate = 0 Then
-        Err.Raise vbObjectError + 5102, , "未在净值数据中找到 OA4400 / P83600 / P83800 的有效净值记录。"
-    End If
+    Dim latestTargetDate As Date
+    Set navGroups = BuildNavGroups(wsNav, targetProducts, latestTargetDate, baselineDate)
 
     currentStep = "读取REITs全收益数据"
     Dim reitsLookup As Object
-    Set reitsLookup = BuildReitsLookup(maxNavDate)
+    Set reitsLookup = BuildReitsLookup(baselineDate)
 
     currentStep = "创建输出工作簿"
     Set wbOutput = CreateCleanWorkbook()
@@ -122,12 +128,13 @@ NextProduct:
     Next i
 
     If exportedCount = 0 Then
-        Err.Raise vbObjectError + 5103, , "三个目标产品均未生成数据。" & vbCrLf & missingText
+        Err.Raise vbObjectError + 5103, , "一页通目标产品均未生成数据。" & vbCrLf & missingText
     End If
 
     currentStep = "保存输出工作簿"
     Dim outputPath As String
-    outputPath = ThisWorkbook.Path & Application.PathSeparator & Format$(maxNavDate, "yyyymmdd") & "-产品一页通.xlsx"
+    outputPath = ThisWorkbook.Path & Application.PathSeparator & Format$(baselineDate, "yyyymmdd") & TEMP_OUTPUT_SUFFIX
+    If Len(Dir$(outputPath)) > 0 Then Kill outputPath
     wbOutput.SaveAs Filename:=outputPath, FileFormat:=xlOpenXMLWorkbook
     wbOutput.Close SaveChanges:=False
     Set wbOutput = Nothing
@@ -141,7 +148,7 @@ NextProduct:
     finalMsg = "产品一页通数据导出完成" & vbCrLf & vbCrLf & _
                "处理结果：" & vbCrLf & _
                "导出产品数：" & exportedCount & vbCrLf & vbCrLf & _
-               "输出文件：" & vbCrLf & outputPath
+               "临时输出文件：" & vbCrLf & outputPath
     If Len(missingText) > 0 Then
         finalMsg = finalMsg & vbCrLf & vbCrLf & "注意事项：" & vbCrLf & _
                    "未导出明细：" & vbCrLf & missingText
@@ -226,7 +233,8 @@ ContinueRow:
     Set BuildProductInfoLookup = result
 End Function
 
-Private Function BuildNavGroups(ByVal wsNav As Worksheet, ByVal targetProducts As Variant, ByRef maxNavDate As Date) As Object
+Private Function BuildNavGroups(ByVal wsNav As Worksheet, ByVal targetProducts As Variant, ByRef maxNavDate As Date, _
+                                ByVal cutoffDate As Date) As Object
     Dim result As Object
     Set result = CreateObject("Scripting.Dictionary")
     result.CompareMode = vbTextCompare
@@ -268,6 +276,7 @@ Private Function BuildNavGroups(ByVal wsNav As Worksheet, ByVal targetProducts A
         navValue = wsNav.Cells(r, navCol).Value
         Dim parsedNavDate As Date
         If Not TryParseDateValue(navDateValue, parsedNavDate) Then GoTo ContinueRow
+        If cutoffDate > 0 And parsedNavDate > cutoffDate Then GoTo ContinueRow
         If Not IsNumeric(navValue) Then GoTo ContinueRow
 
         If parsedNavDate > maxNavDate Then maxNavDate = parsedNavDate

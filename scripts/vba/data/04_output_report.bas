@@ -8,6 +8,8 @@ Private Const SHEET_PRODUCT_CATEGORY As String = "产品分类"
 Private Const SHEET_PRODUCT_INFO As String = "产品信息"
 Private Const ASSET_IMAGE_FOLDER As String = "assets\images"
 Private Const TITLE_IMAGE_NAME As String = "title.png"
+Private Const PRODUCT_CODE_6_MONTH_101 As String = "P83600"
+Private Const PRODUCT_CODE_6_MONTH_102 As String = "P83800"
 
 Private Const COL_BASELINE_DATE As String = "基准日期"
 Private Const COL_SEQ As String = "序号"
@@ -446,7 +448,7 @@ Private Sub WriteConfiguredField(ByVal wsSource As Worksheet, ByVal headers As O
         Case "INCEPTION_ANNUAL": sourceHeader = COL_INCEPTION_ANNUAL
         Case "OPEN_FREQUENCY"
             If headers.Exists(COL_THEORETICAL_INTERVAL) Then
-                targetCell.Value = FormatOpenFrequency(wsSource.Cells(sourceRow, CLng(headers(COL_THEORETICAL_INTERVAL))).Value)
+                targetCell.Value = SourceOpenFrequency(wsSource, headers, sourceRow)
             Else
                 targetCell.Value = "\"
             End If
@@ -529,13 +531,13 @@ Private Sub ApplyRedFrequencyGroups(ByVal wsSource As Worksheet, ByVal sourceHea
     Do While groupStartIndex <= sourceRowCount
         currentStep = "读取第" & CStr(groupStartIndex) & "条开放频率"
         Dim frequencyText As String
-        frequencyText = NormalizeText(wsSource.Cells(sourceRows(groupStartIndex), _
-                                      CLng(sourceHeaders(COL_THEORETICAL_INTERVAL))).Value)
+        frequencyText = NormalizeText(SourceOpenFrequency(wsSource, sourceHeaders, _
+                                                          sourceRows(groupStartIndex)))
         groupEndIndex = groupStartIndex
         ' VBA的And不会短路；先检查数组边界，再读取下一项。
         Do While groupEndIndex < sourceRowCount
-            If NormalizeText(wsSource.Cells(sourceRows(groupEndIndex + 1), _
-                             CLng(sourceHeaders(COL_THEORETICAL_INTERVAL))).Value) <> frequencyText Then Exit Do
+            If NormalizeText(SourceOpenFrequency(wsSource, sourceHeaders, _
+                                                 sourceRows(groupEndIndex + 1))) <> frequencyText Then Exit Do
             groupEndIndex = groupEndIndex + 1
         Loop
 
@@ -818,7 +820,19 @@ Private Function BuildProductShortNameMap() As Object
     Set BuildProductShortNameMap = result
 End Function
 
-Private Function FormatOpenFrequency(ByVal value As Variant) As Variant
+Private Function SourceOpenFrequency(ByVal wsSource As Worksheet, ByVal headers As Object, _
+                                     ByVal sourceRow As Long) As Variant
+    Dim trustCode As Variant
+    trustCode = Empty
+    If headers.Exists(COL_TRUST_CODE) Then
+        trustCode = wsSource.Cells(sourceRow, CLng(headers(COL_TRUST_CODE))).Value
+    End If
+
+    SourceOpenFrequency = FormatOpenFrequency( _
+        wsSource.Cells(sourceRow, CLng(headers(COL_THEORETICAL_INTERVAL))).Value, trustCode)
+End Function
+
+Private Function FormatOpenFrequency(ByVal value As Variant, ByVal trustCode As Variant) As Variant
     Dim textValue As String
     textValue = NormalizeText(value)
     If Len(textValue) = 0 Then
@@ -827,8 +841,10 @@ Private Function FormatOpenFrequency(ByVal value As Variant) As Variant
         FormatOpenFrequency = "每2个月"
     ElseIf textValue = "154" Then
         FormatOpenFrequency = "每5个月"
-    ElseIf textValue = "183" Then
-        FormatOpenFrequency = "每月最后一个周三"
+    ElseIf textValue = "183" And NormalizeText(trustCode) = PRODUCT_CODE_6_MONTH_101 Then
+        FormatOpenFrequency = "每月最后的周三"
+    ElseIf textValue = "183" And NormalizeText(trustCode) = PRODUCT_CODE_6_MONTH_102 Then
+        FormatOpenFrequency = "每月第二个周三"
     ElseIf IsNumeric(textValue) Then
         FormatOpenFrequency = "每" & textValue & "天"
     Else

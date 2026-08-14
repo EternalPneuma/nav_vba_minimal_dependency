@@ -71,7 +71,8 @@ VBA 源文件与运行环境要求：
 │   │   ├── logo.png
 │   │   ├── logo_white.png
 │   │   └── title.png
-│   └── 产品一页通-交鑫致远-模板.pptx    # 产品一页通 PPT 模板
+│   ├── 产品一页通-交鑫致远-模板.pptx    # 交鑫致远6月一页通模板
+│   └── 产品一页通-交鑫致远-模板-12月.pptx # 交鑫致远12月一页通模板
 └── scripts
     ├── py
     │   └── fetch_reits_total_return.py  # 中证 REITs 全收益数据抓取
@@ -92,8 +93,8 @@ VBA 源文件与运行环境要求：
         ├── weekly_recommendation        # 周度推荐材料：依赖更新 → 材料生成
         │   ├── 01_update_weekly_recommendation_dependencies.bas
         │   └── 02_generate_weekly_recommendation.bas
-        ├── product_one_page             # 产品一页通：数据 → 图表 → PPT 输出
-        │   ├── 00_check_import_data.bas
+        ├── product_one_page             # 产品一页通：独立预检 → 数据 → 图表验证 → PPT 输出
+        │   ├── 00_configuration.bas
         │   ├── 01_output_data.bas
         │   ├── 02_output_chart.bas
         │   └── 03_output_ppt.bas
@@ -122,13 +123,14 @@ VBA 源文件与运行环境要求：
 ### 更新数据
 
 1. 产品增减、唯一归属、系列和基准收益率：工作表`产品分类`；使用“是否导出”停用产品，不删除历史行。
-2. 分类、展示分组、输出字段方案和图表位置：工作表`报表配置`。
+2. 分类、展示分组、输出字段方案、图表位置、推荐材料产品范围和一页通版本：工作表`报表配置`。
 3. 图表历史净值：工作表`绘图净值数据`；需要绘制的产品由“报表配置”决定。
 4. 推算开放日：先在工作表`开放日待确认`确认，再写入`开放日`台账。
-5. 推荐材料修改或者新增：工作表`产品要素`。
+5. 推荐材料产品要素：工作表`产品要素`；启停、顺序和图表主题：工作表`报表配置`。
 6. 推荐材料流程图关系：工作表`主要底层资产`。
 7. 推荐材料具体数据计算关系：工作表`底层资产对应关系`。
-8. 缺失净值：VBA 工具 `Tool04_CheckNavData`。
+8. 一页通产品代码、简称和成立日：工作表`产品信息`；模板、输出名称和三个图表产品：工作表`报表配置`。
+9. 缺失净值：VBA 工具 `Tool04_CheckNavData`。
 
 完整配置说明见 [`docs/报表配置与操作手册.md`](docs/报表配置与操作手册.md)。
 
@@ -136,4 +138,4 @@ VBA 源文件与运行环境要求：
 
 1. 图表模板放在 `assets\chart_templates`。
 2. 报表固定图片放在 `assets\images`。
-3. 产品一页通 PPT 模板放在 `assets` 根目录。
+3. 产品一页通 PPT 模板放在 `assets` 根目录；模板必须包含唯一的 `chart_000`、`chart_001`、`chart_002` 和 `table_000`。

@@ -2,8 +2,9 @@
 
 Option Explicit
 
-Private Const TARGET_FILE_SUFFIX As String = "-产品一页通.xlsx"
-Private Const TARGET_FILE_PATTERN As String = "*-产品一页通.xlsx"
+Private Const TEMP_FILE_SUFFIX As String = "-产品一页通-临时.xlsx"
+Private Const TEMP_FILE_PATTERN As String = "*-产品一页通-临时.xlsx"
+Private Const FINAL_FILE_SUFFIX As String = "-产品一页通.xlsx"
 
 Private Const COL_DATE As String = "A"
 Private Const COL_PRODUCT_CODE As String = "B"
@@ -25,6 +26,10 @@ Private Const FONT_NAME As String = "微软雅黑"
 Private Const COLOR_NAV As String = "#C00000"
 Private Const COLOR_PRODUCT_RETURN As String = "#B29A73"
 Private Const COLOR_REITS_RETURN As String = "#BFBFBF"
+
+Private Const EXPECTED_RIGHT_GAP As Double = 54#
+Private Const RIGHT_GAP_TOLERANCE As Double = 3#
+Private Const LABEL_RIGHT_TOLERANCE As Double = 2#
 
 Public Sub OnePage02_GenerateCharts()
     Dim appCalc As XlCalculation
@@ -53,15 +58,14 @@ Public Sub OnePage02_GenerateCharts()
     targetFile = FindLatestOnePageWorkbook()
     targetPath = ThisWorkbook.Path & Application.PathSeparator & targetFile
 
-    currentStep = "打开产品一页通工作簿"
+    currentStep = "打开产品一页通临时工作簿"
     On Error Resume Next
     Set wbTarget = Workbooks(targetFile)
     On Error GoTo CleanFail
-    If wbTarget Is Nothing Then
-        Set wbTarget = Workbooks.Open(targetPath)
-    Else
-        wasOpen = True
+    If Not wbTarget Is Nothing Then
+        Err.Raise vbObjectError + 5202, , "请先关闭一页通临时工作簿：" & targetFile
     End If
+    Set wbTarget = Workbooks.Open(targetPath)
 
     currentStep = "生成产品图表"
     Dim ws As Worksheet
@@ -88,10 +92,38 @@ SheetFail:
 NextSheet:
     Next ws
 
-    currentStep = "保存产品一页通工作簿"
+    If Len(errText) > 0 Then Err.Raise vbObjectError + 5203, , "以下产品图表生成失败：" & vbCrLf & errText
+    If processedCount = 0 Then Err.Raise vbObjectError + 5204, , "临时工作簿中没有可生成图表的产品sheet。"
+
+    currentStep = "第一次保存并重开图表工作簿"
     wbTarget.Save
-    If Not wasOpen Then wbTarget.Close SaveChanges:=False
+    wbTarget.Close SaveChanges:=False
+    Set wbTarget = Workbooks.Open(targetPath)
+
+    currentStep = "重开后重新应用图表布局"
+    For Each ws In wbTarget.Worksheets
+        If LastUsedRow(ws) >= 2 And Len(NormalizeText(ws.Range(COL_PRODUCT_CODE & "2").Value)) > 0 Then
+            DeleteExistingCharts ws
+            CreateProductChart ws
+        End If
+    Next ws
+    wbTarget.Save
+    wbTarget.Close SaveChanges:=False
+
+    currentStep = "最终重开并验证图表布局"
+    Set wbTarget = Workbooks.Open(targetPath)
+    For Each ws In wbTarget.Worksheets
+        If LastUsedRow(ws) >= 2 And Len(NormalizeText(ws.Range(COL_PRODUCT_CODE & "2").Value)) > 0 Then
+            ValidateProductChart ws
+        End If
+    Next ws
+    wbTarget.Close SaveChanges:=False
     Set wbTarget = Nothing
+
+    currentStep = "替换正式图表工作簿"
+    Dim finalPath As String
+    finalPath = ThisWorkbook.Path & Application.PathSeparator & Left$(targetFile, 8) & FINAL_FILE_SUFFIX
+    ReplaceFileKeepingOldOnFailure targetPath, finalPath
 
     Application.Calculation = appCalc
     Application.DisplayAlerts = oldDisplayAlerts
@@ -100,7 +132,7 @@ NextSheet:
 
     Dim finalMsg As String
     finalMsg = "产品一页通图表生成完成" & vbCrLf & vbCrLf & _
-               "目标文件：" & targetFile & vbCrLf & vbCrLf & _
+               "目标文件：" & Mid$(finalPath, Len(ThisWorkbook.Path) + 2) & vbCrLf & vbCrLf & _
                "处理结果：" & vbCrLf & _
                "处理sheet数：" & processedCount
     If Len(skippedText) > 0 Or Len(errText) > 0 Then
@@ -143,11 +175,11 @@ Private Function FindLatestOnePageWorkbook() As String
     Dim latestKey As String
     Dim dateText As String
 
-    fileName = Dir$(ThisWorkbook.Path & Application.PathSeparator & TARGET_FILE_PATTERN)
+    fileName = Dir$(ThisWorkbook.Path & Application.PathSeparator & TEMP_FILE_PATTERN)
     Do While Len(fileName) > 0
         dateText = Left$(fileName, 8)
         If Len(dateText) = 8 And IsNumeric(dateText) Then
-            If Right$(fileName, Len(TARGET_FILE_SUFFIX)) = TARGET_FILE_SUFFIX Then
+            If Right$(fileName, Len(TEMP_FILE_SUFFIX)) = TEMP_FILE_SUFFIX Then
                 If dateText > latestKey Then
                     latestKey = dateText
                     latestFile = fileName
@@ -158,7 +190,7 @@ Private Function FindLatestOnePageWorkbook() As String
     Loop
 
     If Len(latestFile) = 0 Then
-        Err.Raise vbObjectError + 5201, , "未找到 yyyymmdd-产品一页通.xlsx，请先运行 OnePage01_ExportChartData。"
+        Err.Raise vbObjectError + 5201, , "未找到 yyyymmdd-产品一页通-临时.xlsx，请先运行 OnePage01_ExportChartData。"
     End If
 
     FindLatestOnePageWorkbook = latestFile
@@ -272,10 +304,13 @@ Private Sub FormatChartArea(ByVal ch As Chart)
         .Name = FONT_NAME
         .NameFarEast = FONT_NAME
         .NameComplexScript = FONT_NAME
+        .Bold = msoTrue
     End With
     ch.ChartArea.Font.Name = FONT_NAME
+    ch.ChartArea.Font.Bold = True
     ch.Legend.Font.Name = FONT_NAME
     ch.Legend.Font.Size = 10
+    ch.Legend.Font.Bold = True
     On Error GoTo 0
 End Sub
 
@@ -305,6 +340,7 @@ Private Sub FormatCategoryAxis(ByVal ch As Chart, ByVal dateRng As Range)
         .MinorUnitScale = xlDays
         .TickLabels.NumberFormat = "yyyy年mm月dd日"
         .TickLabels.Font.Name = FONT_NAME
+        .TickLabels.Font.Bold = True
     End With
     On Error GoTo 0
 End Sub
@@ -312,17 +348,14 @@ End Sub
 Private Sub FormatPlotArea(ByVal ch As Chart)
     Const PLOT_LEFT As Double = 42
     Const PLOT_TOP As Double = 24
-    Const PLOT_RIGHT_PAD As Double = 54
     Const PLOT_BOTTOM_PAD As Double = 32
 
-    On Error Resume Next
     With ch.PlotArea
         .InsideLeft = PLOT_LEFT
         .InsideTop = PLOT_TOP
-        .InsideWidth = ch.ChartArea.Width - PLOT_LEFT - PLOT_RIGHT_PAD
+        .InsideWidth = ch.ChartArea.Width - PLOT_LEFT - EXPECTED_RIGHT_GAP
         .InsideHeight = ch.ChartArea.Height - PLOT_TOP - PLOT_BOTTOM_PAD
     End With
-    On Error GoTo 0
 End Sub
 
 Private Sub FormatValueAxes(ByVal ch As Chart, ByVal navRng As Range, ByVal productReturnRng As Range, ByVal reitsSeries As Series, ByVal productCode As String)
@@ -361,12 +394,12 @@ Private Sub FormatValueAxes(ByVal ch As Chart, ByVal navRng As Range, ByVal prod
     End If
     If retAxisMax <= retAxisMin Then retAxisMax = retAxisMin + 0.01
 
-    On Error Resume Next
     With ch.Axes(xlValue, xlPrimary)
         .MinimumScale = 1#
         .MaximumScale = navAxisMax
         .TickLabels.NumberFormat = "0.0000"
         .TickLabels.Font.Name = FONT_NAME
+        .TickLabels.Font.Bold = True
     End With
 
     With ch.Axes(xlValue, xlSecondary)
@@ -376,13 +409,11 @@ Private Sub FormatValueAxes(ByVal ch As Chart, ByVal navRng As Range, ByVal prod
         .MinorTickMark = xlTickMarkNone
         .TickLabels.NumberFormat = ";;;"
         .TickLabels.Font.Name = FONT_NAME
+        .TickLabels.Font.Bold = True
     End With
-    On Error GoTo 0
 End Sub
 
 Private Sub ApplyLastPointDataLabel(ByVal s As Series, ByVal yRange As Range, ByVal numberFormatText As String, ByVal colorHex As String)
-    On Error Resume Next
-
     Dim ptCount As Long
     ptCount = s.Points.Count
     If ptCount <= 0 Then Exit Sub
@@ -407,12 +438,95 @@ Private Sub ApplyLastPointDataLabel(ByVal s As Series, ByVal yRange As Range, By
         .NumberFormat = numberFormatText
         .Font.Name = FONT_NAME
         .Font.Size = 10
-        .Font.Bold = False
+        .Font.Bold = True
         .Font.Color = ColorFromHex(colorHex)
         .Position = xlLabelPositionRight
     End With
+End Sub
 
+Private Sub ValidateProductChart(ByVal ws As Worksheet)
+    Dim co As ChartObject
+    On Error Resume Next
+    Set co = ws.ChartObjects("chart_产品一页通")
     On Error GoTo 0
+    If co Is Nothing Then Err.Raise vbObjectError + 5220, , "产品sheet缺少一页通图表：" & ws.Name
+
+    co.Activate
+    DoEvents
+
+    Dim ch As Chart
+    Set ch = co.Chart
+    Dim actualGap As Double
+    actualGap = ch.ChartArea.Width - ch.PlotArea.InsideLeft - ch.PlotArea.InsideWidth
+    If Abs(actualGap - EXPECTED_RIGHT_GAP) > RIGHT_GAP_TOLERANCE Then
+        Err.Raise vbObjectError + 5221, , "图表右侧留白验证失败：" & ws.Name & _
+                  "；期望=" & Format$(EXPECTED_RIGHT_GAP, "0.0") & _
+                  "；实际=" & Format$(actualGap, "0.0")
+    End If
+
+    If ch.Axes(xlValue, xlSecondary).TickLabels.NumberFormat <> ";;;" Then
+        Err.Raise vbObjectError + 5222, , "图表右轴刻度标签未隐藏：" & ws.Name
+    End If
+
+    Dim plotRight As Double
+    plotRight = ch.PlotArea.InsideLeft + ch.PlotArea.InsideWidth
+    Dim seriesItem As Series
+    For Each seriesItem In ch.SeriesCollection
+        ValidateLastDataLabel seriesItem, plotRight, ch.ChartArea.Width, ws.Name
+    Next seriesItem
+End Sub
+
+Private Sub ValidateLastDataLabel(ByVal s As Series, ByVal plotRight As Double, _
+                                  ByVal chartWidth As Double, ByVal sheetName As String)
+    Dim pointIndex As Long
+    For pointIndex = s.Points.Count To 1 Step -1
+        If s.Points(pointIndex).HasDataLabel Then Exit For
+    Next pointIndex
+    If pointIndex = 0 Then Err.Raise vbObjectError + 5223, , "图表末端数据标签缺失：" & sheetName
+
+    ' Excel 2007可能不支持DataLabel的几何属性；标签存在仍是强制要求，
+    ' 只有支持几何读取的版本才执行边界检查。
+    On Error GoTo GeometryUnavailable
+    Dim label As DataLabel
+    Set label = s.Points(pointIndex).DataLabel
+    If label.Left < plotRight - RIGHT_GAP_TOLERANCE Then
+        Err.Raise vbObjectError + 5224, , "图表数据标签未进入右侧留白区：" & sheetName
+    End If
+    If label.Left + label.Width > chartWidth + LABEL_RIGHT_TOLERANCE Then
+        Err.Raise vbObjectError + 5225, , "图表数据标签超出右边界：" & sheetName
+    End If
+    Exit Sub
+
+GeometryUnavailable:
+    If Err.Number = 438 Then
+        Err.Clear
+        Exit Sub
+    End If
+    Dim errorNumber As Long
+    Dim errorDescription As String
+    errorNumber = Err.Number
+    errorDescription = Err.Description
+    Err.Raise errorNumber, , errorDescription
+End Sub
+
+Private Sub ReplaceFileKeepingOldOnFailure(ByVal tempPath As String, ByVal finalPath As String)
+    Dim backupPath As String
+    backupPath = finalPath & ".bak"
+    On Error GoTo ReplaceFail
+
+    If Len(Dir$(backupPath)) > 0 Then Kill backupPath
+    If Len(Dir$(finalPath)) > 0 Then Name finalPath As backupPath
+    Name tempPath As finalPath
+    If Len(Dir$(backupPath)) > 0 Then Kill backupPath
+    Exit Sub
+
+ReplaceFail:
+    Dim description As String
+    description = Err.Description
+    On Error Resume Next
+    If Len(Dir$(finalPath)) = 0 And Len(Dir$(backupPath)) > 0 Then Name backupPath As finalPath
+    On Error GoTo 0
+    Err.Raise vbObjectError + 5226, , "替换正式图表工作簿失败：" & description
 End Sub
 
 Private Function LastNumericPointIndexFromRange(ByVal rng As Range) As Long
