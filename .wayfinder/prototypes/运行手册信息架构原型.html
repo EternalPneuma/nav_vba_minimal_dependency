@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>原型：运行手册信息架构</title>
+<style>
+:root{--ink:#202124;--muted:#667085;--line:#d9dee7;--paper:#fff;--bg:#f4f6f8;--red:#a51d2d;--blue:#245f9e;--warn:#fff2cc;--stop:#fde7e9;--ok:#e8f5e9}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.65 "Microsoft YaHei",sans-serif}a{color:var(--blue)}.prototype-note{background:#252a34;color:white;padding:8px 24px;font-size:13px}.page{max-width:1120px;margin:24px auto 100px;background:var(--paper);box-shadow:0 4px 24px #0001;min-height:780px}.hero{padding:28px 36px;border-bottom:1px solid var(--line)}h1{margin:0 0 8px;font-size:30px}h2{margin:26px 0 12px;font-size:22px}h3{margin:18px 0 8px;font-size:17px}.muted{color:var(--muted)}.tag{display:inline-block;border:1px solid var(--line);border-radius:16px;padding:2px 9px;margin-right:6px;font-size:12px}.stop{background:var(--stop);border-left:5px solid #c62828;padding:12px 16px}.tip{background:var(--warn);border-left:5px solid #d79a00;padding:12px 16px}.ok{background:var(--ok);border-left:5px solid #388e3c;padding:12px 16px}.steps{counter-reset:item;list-style:none;padding:0}.steps li{counter-increment:item;display:grid;grid-template-columns:38px 1fr;gap:10px;margin:14px 0}.steps li:before{content:counter(item);width:30px;height:30px;border-radius:50%;display:grid;place-items:center;background:var(--blue);color:white;font-weight:bold}.button{display:inline-block;background:var(--red);color:white;padding:9px 14px;border-radius:5px;font-weight:bold}.checklist{list-style:none;padding:0}.checklist li{padding:7px 0}.checklist li:before{content:"□";font-size:20px;margin-right:9px}.switcher{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);display:flex;align-items:center;gap:10px;background:#17191f;color:white;border-radius:30px;padding:8px 12px;box-shadow:0 6px 24px #0005;z-index:20}.switcher button{border:0;border-radius:50%;width:32px;height:32px;font-size:19px;cursor:pointer}.switcher strong{min-width:230px;text-align:center}.variant{display:none}.variant.active{display:block}
+/* A */.a-layout{display:grid;grid-template-columns:230px 1fr}.a-nav{padding:24px;border-right:1px solid var(--line);background:#fafafa;position:sticky;top:0;height:fit-content}.a-nav a{display:block;padding:7px 0;text-decoration:none}.a-main{padding:10px 38px 48px}.quick{border:2px solid var(--blue);padding:18px}.route-row{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.route-card{border:1px solid var(--line);padding:14px;border-radius:7px}.route-card:first-child{border-top:5px solid var(--red)}
+/* B */.b-main{padding:10px 36px 48px}.choice{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin:22px 0}.choice article{border:2px solid var(--line);border-radius:10px;padding:20px}.choice .recommended{border-color:var(--red)}.common{display:grid;grid-template-columns:1fr 1fr;gap:18px}.mini-toc{display:flex;gap:20px;padding:12px 36px;border-bottom:1px solid var(--line);position:sticky;top:0;background:white}.mini-toc a{text-decoration:none;font-weight:bold}
+/* C */.c-layout{display:grid;grid-template-columns:1fr 290px}.c-main{padding:10px 38px 48px}.c-side{padding:24px;background:#fafafa;border-left:1px solid var(--line)}.phase{border-left:3px solid var(--blue);padding:0 0 22px 24px;margin-left:15px}.phase h2:before{content:"";display:inline-block;width:14px;height:14px;background:var(--blue);border-radius:50%;margin-left:-32px;margin-right:16px}.ref{border:1px solid var(--line);padding:12px;margin-bottom:12px;background:white}
+@media(max-width:800px){.a-layout,.c-layout,.common{grid-template-columns:1fr}.a-nav,.c-side{position:static;border:0}.route-row,.choice{grid-template-columns:1fr}.switcher strong{min-width:150px}}
+</style>
+</head>
+<body>
+<div class="prototype-note">抛弃式原型，只用于回答：运行手册应采用哪种章节、阅读路径和信息层级？不代表正式文档内容或视觉稿。</div>
+
+<section id="variantA" class="variant page">
+<header class="hero"><span class="tag">A</span><span class="tag">任务优先</span><h1>产品净值报表运行手册</h1><p class="muted">先用“每周照着做”完成标准流程；遇到分支再跳到对应说明。</p></header>
+<div class="a-layout">
+<nav class="a-nav"><strong>本页目录</strong><a href="#a-start">先看这里</a><a href="#a-weekly">每周标准流程</a><a href="#a-open">开放日待确认</a><a href="#a-extra">一页通与推荐材料</a><a href="#a-check">交付前检查</a><a href="#a-stop">停止与求助</a><hr><a href="#">附录：文件清单</a><a href="#">附录：低频操作</a><a href="#">业务配置手册 ↗</a></nav>
+<main class="a-main">
+<section id="a-start" class="quick"><h2 style="margin-top:0">先看这里：今天的推荐顺序</h2><div class="route-row"><article class="route-card"><b>1. 产品业绩展示</b><br><span class="muted">每次优先运行</span></article><article class="route-card"><b>2. 一页通</b><br><span class="muted">按交付需要运行</span></article><article class="route-card"><b>3. 推荐材料</b><br><span class="muted">按交付需要运行</span></article></div><p class="tip">看到“失败”“开放日待确认”或日期不一致时，不要继续后面的交付物。</p></section>
+<section id="a-weekly"><h2>每周标准流程</h2><ol class="steps"><li><div><b>准备文件</b><br>把 181 文件放到主工作簿同级目录；保存工作簿并关闭旧输出文件。〔截图：正确目录〕</div></li><li><div><b>打开操作面板</b><br><code>Alt + F8</code> → <code>AAA启动控制台</code>。核对“当前净值截止”。〔截图：面板入口〕</div></li><li><div><b>运行推荐主按钮</b><br><span class="button">一键生成产品业绩展示（推荐优先）</span></div></li><li><div><b>按结果分流</b><br>完成 → 检查交付物；开放日待确认 → 看下一节；失败 → 停止与求助。</div></li></ol></section>
+<section id="a-open"><h2>如果出现“开放日待确认”</h2><p>只给出运行人员需要做的三种选择：确认、拒绝并补录、无法判断则升级。处理后重新运行完整主按钮。</p></section>
+<section id="a-extra"><h2>按需运行其他交付物</h2><h3>一页通</h3><p>运行前额外确认 REITs 文件和 PowerPoint；所有启用版本必须一起成功。</p><h3>推荐材料</h3><p>运行按钮后检查产品工作表、规模、底层资产和指定主题图片。</p></section>
+<section id="a-check"><h2>交付前检查</h2><ul class="checklist"><li>所有输出文件日期等于本次基准日期</li><li>数据摘要无未解释异常</li><li>图片非空白，产品、主题和顺序正确</li></ul></section>
+<section id="a-stop" class="stop"><h2 style="margin-top:0">停止与求助</h2><p>一页集中列出红线条件，并要求记录截图、完整错误文字、基准日期和失败步骤。</p></section>
+</main></div></section>
+
+<section id="variantB" class="variant page">
+<header class="hero"><span class="tag">B</span><span class="tag">交付物入口</span><h1>今天要生成什么？</h1><p class="muted">先选交付物，再进入对应的最短路径。公共准备和异常处理只写一次。</p></header>
+<nav class="mini-toc"><a href="#b-choice">选择交付物</a><a href="#b-common">公共准备</a><a href="#b-result">结果判断</a><a href="#b-ref">参考</a></nav>
+<main class="b-main">
+<section id="b-choice" class="choice"><article class="recommended"><span class="tag">推荐优先</span><h2>产品业绩展示</h2><p>181 净值 → 开放日 → 分类表现 → 图表 → 展示报表</p><p><b>入口：</b>一键生成产品业绩展示</p><a href="#">进入步骤 →</a></article><article><h2>一页通</h2><p>绘图净值 + REITs + PowerPoint → 全部启用版本</p><p><b>入口：</b>一键运行一页通</p><a href="#">进入步骤 →</a></article><article><h2>推荐材料</h2><p>产品要素 + 底层资产 + 基准日图片</p><p><b>入口：</b>一键生成推荐材料</p><a href="#">进入步骤 →</a></article></section>
+<section id="b-common"><h2>所有流程的公共准备</h2><div class="common"><div><h3>文件</h3><ul class="checklist"><li>主工作簿已保存</li><li>源文件位于同级目录</li><li>输出文件已关闭</li></ul></div><div><h3>日期</h3><ul class="checklist"><li>知道预期基准日期</li><li>面板能识别当前净值截止</li><li>一页通 REITs 不早于基准日</li></ul></div></div></section>
+<section id="b-result"><h2>运行结束后只做一个判断</h2><div class="common"><div class="ok"><b>可以进入交付检查</b><br>面板完成、日期一致、无异常明细。</div><div class="stop"><b>必须停止</b><br>失败、待确认、日期不一致、数量不符或看不懂。</div></div><h3>特殊分支：开放日待确认</h3><p>以一张三分支决策表呈现，不把推算算法放在主路径。</p></section>
+<section id="b-ref"><h2>参考区</h2><p>文件名速查 · 输出位置 · 联系人与升级记录 · 低频操作 · 业务配置手册链接</p></section>
+</main></section>
+
+<section id="variantC" class="variant page">
+<header class="hero"><span class="tag">C</span><span class="tag">运行周期</span><h1>一次报表运行：准备、执行、交付</h1><p class="muted">按时间线组织正文，右侧常驻“看不懂就停”和速查信息。</p></header>
+<div class="c-layout"><main class="c-main">
+<section class="phase"><h2>运行前</h2><h3>1. 接收和核对文件</h3><p>181、REITs、主工作簿和资源目录。</p><h3>2. 清理运行环境</h3><p>保存工作簿，关闭输出文件，记录预期基准日期。</p></section>
+<section class="phase"><h2>运行中</h2><h3>3. 先生成产品业绩展示</h3><p>打开面板，核对截止日，点击推荐主按钮。</p><h3>4. 处理唯一允许的人工分支</h3><p>开放日确认后完整重跑；其他失败直接升级。</p><h3>5. 按交付清单追加材料</h3><p>一页通、推荐材料分别运行。</p></section>
+<section class="phase"><h2>运行后</h2><h3>6. 按交付物检查</h3><ul class="checklist"><li>文件齐全且日期一致</li><li>数据摘要和图片无异常</li><li>一页通版本成批成功</li></ul><h3>7. 登记与转移</h3><p>填写本次交接记录，再按现场规定转移文件。</p></section>
+<section><h2>附录</h2><p>低频操作只给“适用条件 + 谁能做 + 跳转维护文档”，不复制维护步骤。</p></section>
+</main><aside class="c-side"><div class="stop"><b>看不懂就停</b><br>不要修改配置、开放日或模板来试错。</div><h3>本次运行速记</h3><div class="ref">预期基准日期：________</div><div class="ref">交付物：<br>□ 展示报表<br>□ 一页通<br>□ 推荐材料</div><h3>快速跳转</h3><div class="ref">开放日待确认</div><div class="ref">输出文件名速查</div><div class="ref">停止条件</div><div class="ref">求助时要提供什么</div></aside></div></section>
+
+<div class="switcher"><button id="prev" aria-label="上一方案">←</button><strong id="label"></strong><button id="next" aria-label="下一方案">→</button></div>
+<script>
+const variants=[['A','任务优先：标准流程是正文'],['B','交付物入口：先选今天要什么'],['C','运行周期：准备—执行—交付']];
+function currentIndex(){const key=(new URLSearchParams(location.search).get('variant')||'A').toUpperCase();const i=variants.findIndex(v=>v[0]===key);return i<0?0:i}
+function render(i){document.querySelectorAll('.variant').forEach(x=>x.classList.remove('active'));document.getElementById('variant'+variants[i][0]).classList.add('active');document.getElementById('label').textContent=variants[i][0]+' — '+variants[i][1];const u=new URL(location.href);u.searchParams.set('variant',variants[i][0]);history.replaceState(null,'',u);scrollTo(0,0)}
+function cycle(d){render((currentIndex()+d+variants.length)%variants.length)}
+document.getElementById('prev').onclick=()=>cycle(-1);document.getElementById('next').onclick=()=>cycle(1);
+addEventListener('keydown',e=>{if(['INPUT','TEXTAREA'].includes(document.activeElement.tagName)||document.activeElement.isContentEditable)return;if(e.key==='ArrowLeft')cycle(-1);if(e.key==='ArrowRight')cycle(1)});render(currentIndex());
+</script>
+</body></html>

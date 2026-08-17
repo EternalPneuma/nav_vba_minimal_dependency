@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>原型：维护指南信息架构</title>
+<style>
+:root{--ink:#18202a;--muted:#637083;--line:#d8dee8;--paper:#fff;--bg:#eef2f6;--navy:#183b5b;--blue:#246aa5;--orange:#b85c18;--red:#a62b35;--green:#28764a;--soft-blue:#edf6fc;--soft-orange:#fff4e8;--soft-red:#fcecef;--soft-green:#eaf6ef}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.65 "Microsoft YaHei",sans-serif}a{color:var(--blue)}code{font-family:Consolas,monospace;background:#f2f4f7;border-radius:3px;padding:1px 4px}.prototype-note{background:#202934;color:#fff;padding:9px 24px;font-size:13px}.page{display:none;max-width:1180px;min-height:850px;margin:22px auto 100px;background:var(--paper);box-shadow:0 5px 25px #1c27331a}.page.active{display:block}.hero{padding:28px 36px 22px;border-bottom:1px solid var(--line)}h1{font-size:29px;margin:4px 0 7px}h2{font-size:21px;margin:27px 0 11px}h3{font-size:16px;margin:16px 0 7px}.muted{color:var(--muted)}.tag{display:inline-block;padding:2px 9px;border:1px solid var(--line);border-radius:14px;margin-right:6px;font-size:12px}.recommended{border-color:var(--orange)!important}.recommended-label{color:var(--orange);font-weight:bold}.callout{padding:13px 15px;border-left:5px solid var(--blue);background:var(--soft-blue);margin:14px 0}.danger{border-left-color:var(--red);background:var(--soft-red)}.business{border-left-color:var(--orange);background:var(--soft-orange)}.technical{border-left-color:var(--green);background:var(--soft-green)}.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.card{border:1px solid var(--line);border-radius:7px;padding:14px;background:#fff}.card h3{margin-top:0}.route{font-weight:bold;color:var(--navy)}table{border-collapse:collapse;width:100%;margin:10px 0 18px}th,td{border:1px solid var(--line);padding:9px 10px;vertical-align:top;text-align:left}th{background:#f3f6f9}.mini{font-size:12px}.toc a{display:block;text-decoration:none;padding:6px 9px;border-radius:4px}.toc a:hover{background:#e9eef4}.tree{font-family:Consolas,"Microsoft YaHei",monospace;white-space:pre-wrap;background:#f5f7fa;border:1px solid var(--line);padding:14px}.check{list-style:none;padding:0}.check li:before{content:"□";font-size:18px;margin-right:8px}.switcher{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:30;display:flex;align-items:center;gap:9px;padding:8px 12px;background:#171d24;color:#fff;border-radius:30px;box-shadow:0 6px 24px #0006}.switcher button{border:0;width:33px;height:33px;border-radius:50%;font-size:18px;cursor:pointer}.switcher strong{min-width:260px;text-align:center}.verdict{border:2px dashed var(--orange);padding:15px;margin-top:26px;background:#fffaf4}
+/* A: intent first */.a-layout{display:grid;grid-template-columns:235px 1fr}.a-side{padding:22px 17px;background:#f7f9fb;border-right:1px solid var(--line);position:sticky;top:0;height:fit-content}.a-main{padding:8px 34px 45px}.intent-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}.intent{border:1px solid var(--line);border-left:5px solid var(--blue);padding:14px}.intent b{display:block;font-size:15px}.path{margin-top:7px;color:var(--muted)}
+/* B: architecture first */.b-main{padding:8px 36px 48px}.layer-map{display:grid;grid-template-columns:repeat(5,1fr);gap:9px;margin:18px 0}.layer{padding:14px 10px;border:1px solid var(--line);text-align:center;background:#f8fafc}.layer strong{display:block;color:var(--navy)}.chapter-strip{display:flex;gap:7px;overflow:auto;border-bottom:1px solid var(--line);padding:11px 36px;position:sticky;top:0;background:white;z-index:2}.chapter-strip span{white-space:nowrap;border:1px solid var(--line);border-radius:15px;padding:3px 9px}
+/* C: lifecycle */.c-layout{display:grid;grid-template-columns:1fr 285px}.c-main{padding:8px 36px 48px}.c-side{padding:22px;background:#f7f9fb;border-left:1px solid var(--line)}.phase{position:relative;border-left:4px solid var(--blue);padding:0 0 25px 25px;margin-left:12px}.phase h2{margin-top:0}.phase:before{content:"";position:absolute;width:15px;height:15px;border-radius:50%;background:var(--blue);left:-9px;top:5px}.ref{border:1px solid var(--line);padding:10px;margin-bottom:10px;background:white}
+@media(max-width:820px){.a-layout,.c-layout{grid-template-columns:1fr}.a-side,.c-side{position:static;border:0}.cards,.intent-grid,.layer-map{grid-template-columns:1fr}.switcher strong{min-width:150px}.chapter-strip{position:static}}
+</style>
+</head>
+<body>
+<div class="prototype-note">抛弃式原型，只回答：维护指南按什么信息架构组织，技术维护人员如何从需求或故障快速到达正确入口？不代表正式文档内容或最终视觉样式。</div>
+
+<section id="variantA" class="page">
+<header class="hero"><span class="tag">A</span><span class="tag">修改意图优先</span><h1>产品净值报表维护指南</h1><p class="muted">首页先回答“你要改什么／现在坏在哪里”，架构和模块说明作为定位依据，不要求维护人员先通读源码结构。</p></header>
+<div class="a-layout">
+<nav class="a-side toc"><strong>快速入口</strong><a href="#a-change">我要修改</a><a href="#a-fault">我要排障</a><a href="#a-release">我要发布或恢复</a><hr><strong>正文</strong><a href="#a-baseline">系统基线</a><a href="#a-authority">权威数据与边界</a><a href="#a-recipes">修改说明卡</a><a href="#a-diagnose">故障诊断</a><a href="#a-verify">验证与发布</a><a href="#a-risk">已知限制</a><hr><a href="#">运行手册 ↗</a><a href="#">业务配置参考 ↗</a></nav>
+<main class="a-main">
+<section id="a-change"><h2>我要修改什么？</h2><div class="intent-grid">
+<div class="intent"><b>产品、分类、字段或图表位置</b><div class="path">先到业务配置参考 → 配置预检 → 完整流程验收</div></div>
+<div class="intent"><b>181 导入、开放日或指标算法</b><div class="path"><code>scripts/vba/data</code> → 对应输入边界 → 中间报表回归</div></div>
+<div class="intent"><b>图表、展示报表或固定图片</b><div class="path"><code>scripts/vba/chart</code> / <code>data/04</code> / <code>assets</code> → 两主题与目视验收</div></div>
+<div class="intent"><b>一页通或推荐材料</b><div class="path">对应领域目录 → 独立预检 → Office 重开验证</div></div>
+<div class="intent"><b>操作面板或主流程顺序</b><div class="path"><code>optional_panel</code> + <code>00_report_pipeline</code> → 三主按钮失败传播</div></div>
+<div class="intent"><b>VBA 发布或外网 Python</b><div class="path"><code>sync-vba.ps1</code> / <code>scripts/py</code> → 临时副本或样例测试</div></div>
+</div></section>
+<section id="a-fault"><h2>现在坏在哪里？</h2><table><tr><th>看到的症状</th><th>先保留什么</th><th>第一诊断入口</th><th>谁决定能否继续</th></tr><tr><td>面板某一步失败</td><td>基准日、按钮、失败步骤、完整错误</td><td>主调用链定位对应模块；先查输入和路径</td><td>技术维护；涉及业务日期则业务确认</td></tr><tr><td>日期或产品数量不对</td><td>目录清单、181 文件、数据摘要</td><td>181 导入边界、浏览表优先规则、配置产品集合</td><td>数据事实由业务确认，程序问题由技术修复</td></tr><tr><td>图表／图片／PPT 不对</td><td>同日中间文件、模板版本、截图</td><td>产品汇总 → 图表 → 图片 → 最终输出逐层定位</td><td>技术修复；视觉内容最终人工验收</td></tr><tr><td>同步失败或中文乱码</td><td>脚本完整输出、ACP、源文件名</td><td>CP936、UTF-8/CRLF、VBE 信任和读回差异</td><td>技术维护，不允许绕过同步保护</td></tr></table></section>
+<section id="a-release"><h2>我要发布或恢复</h2><div class="cards"><div class="card"><h3>代码发布</h3><p>源码检查 → 临时工作簿副本 → CP936 同步 → VBE 读回 → Office 回归 → 正式更新。</p></div><div class="card"><h3>运行恢复</h3><p>保留现场 → 修正根因 → 默认完整重跑；只有确认上游有效时才补跑单项。</p></div><div class="card"><h3>数据恢复</h3><p>从修改前工作簿副本恢复。重新同步 VBA 不能恢复工作簿业务数据。</p></div></div></section>
+<section id="a-baseline"><h2>1. 先建立系统基线</h2><p>只保留三张图：内外网与文件接口、模块到交付物、三个主调用链。开头声明三类权威：</p><div class="tree">程序逻辑权威：scripts/vba
+运行与业务状态：上层产品净值数据库.xlsm
+业务配置权威：对应工作表及报表配置六张命名表</div></section>
+<section id="a-authority"><h2>2. 权威数据与责任边界</h2><p>使用“权威内容／谁会写入／修改前置授权／验证方式”四列表。突出：<code>开放日待确认</code>不是开放日权威；推荐材料范围不由<code>产品要素</code>决定；正式输出文件不是维护入口。</p><div class="callout business"><b>业务确认：</b>开放日、产品归属、启停、范围、展示文字和业务主数据。技术人员不得从算法或旧文件替业务作决定。</div><div class="callout technical"><b>技术处理：</b>代码、同步、路径、格式、文件发现、错误传播、模板锚点和恢复操作。技术修复后仍需业务验收结果。</div></section>
+<section id="a-recipes"><h2>3. 修改说明卡</h2><p>每类修改不写成长教程，统一使用：</p><table><tr><th>需求示例</th><th>首要入口</th><th>可能连带</th><th>最小测试</th><th>必须人工确认</th><th>回滚点</th></tr><tr><td>修改开放日算法</td><td><code>00_open_date_confirmation.bas</code></td><td><code>02_calculate_open_date.bas</code>、运行手册</td><td>日开／周开／183 特例／普通间隔／缺锚点</td><td>节假日与真实开放日</td><td>修改前源码和工作簿副本</td></tr></table><p class="muted">卡片按“业务配置、数据与计算、图表与展示、一页通、推荐材料、面板与工具、Python 与部署”分组。</p></section>
+<section id="a-diagnose"><h2>4. 故障诊断与停止边界</h2><p>先按症状查表，再进入一条统一诊断循环：</p><div class="tree">记录现场 → 判断是输入／业务数据／代码／环境／输出占用
+→ 在副本复现 → 找到首个错误层 → 修复根因
+→ 从受控恢复点重跑 → 技术验证 → 业务放行</div><div class="callout danger"><b>立即停止：</b>需要猜业务日期、准备直接改正式输出、没有修改前副本、计划绕过 CP936、无法确认目录里的“最新文件”属于本次基准日，或破坏性工具影响范围不清。</div></section>
+<section id="a-verify"><h2>5. 测试、同步、发布与回滚</h2><p>按变更层级给验证矩阵：纯配置、VBA 数据逻辑、视觉模板、一页通 PowerPoint、Python、面板编排。发布清单明确临时副本、源码编码、两份 PPT 模板、读回验证、输出目视和正式工作簿备份。</p></section>
+<section id="a-risk"><h2>6. 已知限制与附录</h2><p>集中记录无数据事务、输出保护不一致、最新文件选择、浏览表优先、回归脚本不验证视觉、备份渠道待定义。附录只放文件名、公开宏、模块索引和错误证据模板。</p></section>
+<div class="verdict"><b>方案 A 的取舍</b><br>最快回答维护人员的现实问题，允许架构细节按需深入；代价是同一模块可能在多个修改卡中被引用，需要用链接而不是复制说明来控制重复。</div>
+</main></div></section>
+
+<section id="variantB" class="page">
+<header class="hero"><span class="tag">B</span><span class="tag">系统分层优先</span><span class="recommended-label">根据反馈推荐</span><h1>产品净值报表技术架构与维护</h1><p class="muted">从 GitHub 完整获取受控项目，理解系统分层、每个目录和关键模块，再让维护人员或 LLM 按修改导航进入最小必要上下文。</p></header>
+<div class="chapter-strip"><span>获取源码</span><span>系统总览</span><span>工作簿与数据</span><span>数据流水线</span><span>图表流水线</span><span>一页通</span><span>推荐材料</span><span>操作面板</span><span>LLM 修改</span><span>Git 发布</span><span>排障</span></div>
+<main class="b-main">
+<h2>阅读起点：先获得受控项目</h2><div class="callout technical"><b>当前权威仓库：</b><code>https://github.com/EternalPneuma/nav_vba_minimal_dependency</code>，公开 GitHub 仓库，默认分支为 <code>master</code>。文档先区分“克隆原仓库并直接推送”和“Fork 后通过 Pull Request”两种权限路径。</div><div class="cards"><div class="card"><h3>完整克隆</h3><p><code>git clone ...</code> 后核对分支、提交号、两份 PPT 模板、VBA 源码、资源和主工作簿快照。</p></div><div class="card"><h3>Fork 与同步</h3><p>个人仓库为 <code>origin</code>，原项目为 <code>upstream</code>；从 upstream/master 同步，功能分支推到 origin。</p></div><div class="card"><h3>完整性的含义</h3><p>Git 只保证受跟踪源码、静态资源和工作簿快照；内网最新业务数据、忽略的输入输出和 backup 不随 clone 获得。</p></div></div>
+<h2>五层系统图</h2><div class="layer-map"><div class="layer"><strong>外部数据</strong>181、REITs、浏览表</div><div class="layer"><strong>状态中心</strong>xlsm 与权威工作表</div><div class="layer"><strong>领域流水线</strong>data / chart / one_page / weekly</div><div class="layer"><strong>Office 适配</strong>Excel、PowerPoint、文件系统</div><div class="layer"><strong>交付物</strong>Excel、PNG、PPT</div></div>
+<div class="cards"><div class="card"><h3>第 1 部分：获取与架构</h3><p>GitHub 获取/Fork/同步、完整性核对、内外网数据流、文件接口、三类权威和三个主调用链。</p></div><div class="card"><h3>第 2 部分：模块地图</h3><p>每个目录按职责、公开入口、读取、写入、错误模式、下游、测试点和推荐给 LLM 的上下文文件说明。</p></div><div class="card"><h3>第 3 部分：变更与运维</h3><p>修改导航、LLM 协作约束、同步发布、Git 分支/推送/PR、故障诊断、恢复与已知限制。</p></div></div>
+<h2>建议目录</h2><div class="tree"># 产品净值报表维护指南
+## 1. 从 GitHub 获取完整受控项目
+### Clone、Fork、origin/upstream、分支、推送与 Pull Request
+### 克隆完整性检查，以及 Git 不包含的内网业务状态
+## 2. 系统总览、权威边界与主调用链
+## 3. 运行目录、文件接口和工作簿数据模型
+## 4. data：配置、181、开放日和展示输出
+## 5. chart：绘图数据、汇总、图表和图片
+## 6. product_one_page：Excel 与 PowerPoint
+## 7. weekly_recommendation：依赖和材料
+## 8. optional_panel、tool 与批处理错误传播
+## 9. Python 外网工具
+## 10. 使用 LLM 进行受控代码修改
+## 11. 按修改意图查入口与影响面
+## 12. VBA 同步、测试、Git 提交和发布
+## 13. 故障诊断、恢复与已知限制
+## 附录：模块/公开宏/权威工作表/命令速查</div>
+<h2>模块章节固定结构</h2><table><tr><th>模块</th><th>职责与接口</th><th>读取／写入</th><th>错误模式</th><th>验证</th><th>LLM 最小上下文</th></tr><tr><td><code>chart</code></td><td>长期绘图数据到 PNG；<code>Chart01</code> 至 <code>Chart04</code></td><td>写绘图净值；生成并修改汇总文件</td><td>浏览表优先、最新文件串用、模板缺失</td><td>数据摘要、两主题、PNG 目视</td><td>目标模块 + <code>00_report_configuration.bas</code> + 面板调用链 + 对应配置说明</td></tr></table><p>不能只列文件名。每章需要解释“这一部分为什么存在、外部接口是什么、状态写在哪里、改动会沿哪条调用链传播”，让维护人员和 LLM 都能先形成正确心智模型。</p>
+<h2>修改导航与 LLM 协作如何放置</h2><p>保留方案 A 的首页“需求 → 首要入口 → 连带模块 → 最小测试”索引；详细影响面放在各模块章末尾。LLM 章节提供标准任务包：先读 <code>AGENTS.md</code>、架构总览和目标模块章节，再读取相关源码；禁止直接改 VBE、正式输出或未经确认的业务事实；完成后报告修改文件、编码检查、测试证据和未执行的 Office 验证。</p><div class="callout danger"><b>LLM 边界：</b>LLM 可以定位、编辑、检查和生成测试步骤，但不能替代开放日、产品范围、展示内容和最终交付物的业务确认，也不能在非 CP936 环境绕过同步保护。</div>
+<h2>故障边界</h2><div class="cards"><div class="card business"><h3>业务事实不确定</h3><p>停止技术处理，交由业务确认。记录决定后再继续。</p></div><div class="card technical"><h3>技术实现失败</h3><p>沿模块输入、状态、副作用和下游逐层诊断。</p></div><div class="card danger"><h3>恢复点不存在</h3><p>不得在正式工作簿试错；先保全现场并建立副本。</p></div></div>
+<div class="verdict"><b>方案 B（增强版）的取舍</b><br>以架构和模块地图保证维护人员及 LLM 获得完整上下文，同时吸收方案 A 的修改索引和方案 C 的发布／恢复门。正文必须描述接口、状态和影响链，避免退化为逐文件复述源码。篇幅会更长，但最符合长期接管和 LLM 编码维护场景。</div>
+</main></section>
+
+<section id="variantC" class="page">
+<header class="hero"><span class="tag">C</span><span class="tag">变更生命周期优先</span><h1>维护一次变更：定位、修改、验证、发布</h1><p class="muted">把维护指南组织成一条受控变更流程，架构和故障信息在每个阶段就近出现。</p></header>
+<div class="c-layout"><main class="c-main">
+<section class="phase"><h2>阶段 1：受理与分级</h2><p>先判断是业务配置、业务事实、代码、资源模板、环境还是运行数据问题；明确授权人、基准日期和交付影响。</p><div class="callout business"><b>业务确认门：</b>开放日、产品范围、归属、启停、展示文字不能由技术维护人员自行决定。</div></section>
+<section class="phase"><h2>阶段 2：定位权威与影响面</h2><p>使用“修改意图 → 权威入口 → 调用链 → 交付物”矩阵。三张架构图作为影响分析工具，而不是独立的长篇背景。</p><table><tr><th>变更</th><th>权威入口</th><th>影响链</th></tr><tr><td>修改一页通模板</td><td>PPT 模板 + <code>tblOnePageVersions</code></td><td>静态预检 → 三图和表格替换 → 整批验证</td></tr></table></section>
+<section class="phase"><h2>阶段 3：建立恢复点并修改</h2><p>先复制工作簿、记录目录清单和 Git 状态。源码只改 <code>scripts/vba</code>；业务数据只改权威工作表；不直接修正式输出。</p><div class="callout danger"><b>变更门：</b>无副本、影响范围不明、业务事实未确认、同步环境非 CP936，均不得进入修改。</div></section>
+<section class="phase"><h2>阶段 4：按风险验证</h2><p>配置改动跑预检和完整流程；数据逻辑覆盖边界样例；视觉和 PowerPoint 必须重开并人工检查；比较脚本只承担单元格级回归。</p></section>
+<section class="phase"><h2>阶段 5：同步与发布</h2><p>在临时工作簿副本运行同步，确认源码编码、VBE 读回、两份 PPT 模板和 Office 回归，再更新正式工作簿与发布记录。</p></section>
+<section class="phase"><h2>阶段 6：故障响应与回滚</h2><div class="tree">捕获症状 → 停止扩大影响 → 保全现场
+→ 回到最近恢复点 → 在副本定位首个错误层
+→ 修复并重新验证 → 完整重跑 → 业务放行</div><p>按故障发生阶段组织：受理错误、数据写入、输出生成、Office 自动化、同步发布、交付验收。</p></section>
+<section><h2>附录：系统参考</h2><p>权威工作表、目录结构、公开宏、主调用链、环境矩阵、已知限制和错误证据模板集中放在后部。</p></section>
+<div class="verdict"><b>方案 C 的取舍</b><br>最强调可恢复变更和责任门，适合正式变更管理；但日常查一个故障时要先判断它属于哪个阶段，模块知识被拆到流程和附录两处。</div>
+</main><aside class="c-side"><h3>每次变更记录</h3><div class="ref">需求与授权：________</div><div class="ref">基准日期／版本：________</div><div class="ref">权威入口：________</div><div class="ref">工作簿副本：________</div><div class="ref">最小测试：________</div><div class="ref">业务验收人：________</div><h3>四个不可越过的门</h3><div class="callout business mini">业务事实已确认</div><div class="callout danger mini">恢复点已建立</div><div class="callout technical mini">技术验证已完成</div><div class="callout business mini">业务结果已放行</div></aside></div></section>
+
+<div class="switcher"><button id="prev" aria-label="上一方案">←</button><strong id="label"></strong><button id="next" aria-label="下一方案">→</button></div>
+<script>
+const variants=[['A','修改意图优先：先回答要改什么'],['B','系统分层优先：先理解模块'],['C','变更生命周期：按受控流程维护']];
+function index(){const k=(new URLSearchParams(location.search).get('variant')||'A').toUpperCase();const i=variants.findIndex(v=>v[0]===k);return i<0?0:i}
+function render(i){document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));document.getElementById('variant'+variants[i][0]).classList.add('active');document.getElementById('label').textContent=variants[i][0]+' — '+variants[i][1];const u=new URL(location.href);u.searchParams.set('variant',variants[i][0]);history.replaceState(null,'',u);scrollTo(0,0)}
+function cycle(d){render((index()+d+variants.length)%variants.length)}
+document.getElementById('prev').onclick=()=>cycle(-1);document.getElementById('next').onclick=()=>cycle(1);addEventListener('keydown',e=>{const a=document.activeElement;if(['INPUT','TEXTAREA'].includes(a.tagName)||a.isContentEditable)return;if(e.key==='ArrowLeft')cycle(-1);if(e.key==='ArrowRight')cycle(1)});render(index());
+</script>
+</body>
+</html>
