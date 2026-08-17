@@ -28,6 +28,9 @@ Private Const STATUS_WRITTEN As String = "已写入"
 Private Const STATUS_MANUAL As String = "待人工处理"
 Private Const STATUS_RESOLVED As String = "已人工处理"
 
+Private Const PRODUCT_CODE_6_MONTH_101 As String = "P83600"
+Private Const PRODUCT_CODE_6_MONTH_102 As String = "P83800"
+
 Public Function OpenDate_EnsureCurrentBaselineReady() As Boolean
     Dim oldCalculation As XlCalculation
     Dim oldScreenUpdating As Boolean
@@ -261,7 +264,9 @@ Private Sub CreateMissingProposals(ByVal wsPending As Worksheet, ByVal baselineD
         If Len(seqKey) = 0 Or Len(intervalText) = 0 Or Not IsNumeric(intervalText) Then GoTo ContinueProduct
 
         Dim intervalDays As Long
+        Dim trustCode As String
         intervalDays = CLng(intervalText)
+        trustCode = NormalizeText(wsProducts.Cells(r, CLng(productHeaders(COL_TRUST_CODE))).Value)
         If intervalDays <= 0 Or intervalDays = 1 Then GoTo ContinueProduct
 
         Dim nextKnownDate As Variant
@@ -278,7 +283,7 @@ Private Sub CreateMissingProposals(ByVal wsPending As Worksheet, ByVal baselineD
 
         Dim proposedDate As Variant
         Dim noteText As String
-        proposedDate = InferNextOpenDate(baselineDate, intervalDays, anchorDate)
+        proposedDate = InferNextOpenDate(baselineDate, intervalDays, anchorDate, trustCode)
 
         If IsEmpty(proposedDate) Then
             noteText = "没有最近已知开放日，无法按理论间隔推算"
@@ -288,7 +293,7 @@ Private Sub CreateMissingProposals(ByVal wsPending As Worksheet, ByVal baselineD
                 manualCount = manualCount + 1
             End If
         Else
-            noteText = BuildInferenceNote(intervalDays)
+            noteText = BuildInferenceNote(intervalDays, trustCode)
             If AddProposalIfMissing(wsPending, pendingHeaders, proposalKeys, wsProducts, r, productHeaders, _
                                     baselineDate, anchorDate, proposedDate, STATUS_PENDING, noteText) Then
                 createdCount = createdCount + 1
@@ -398,11 +403,13 @@ ContinueRow:
 End Sub
 
 Private Function InferNextOpenDate(ByVal baselineDate As Date, ByVal intervalDays As Long, _
-                                   ByVal anchorDate As Variant) As Variant
+                                   ByVal anchorDate As Variant, ByVal trustCode As String) As Variant
     If intervalDays = 7 Then
         InferNextOpenDate = GetNextWednesday(baselineDate)
-    ElseIf intervalDays = 183 Then
+    ElseIf intervalDays = 183 And trustCode = PRODUCT_CODE_6_MONTH_101 Then
         InferNextOpenDate = GetNextMonthEndWednesday(baselineDate)
+    ElseIf intervalDays = 183 And trustCode = PRODUCT_CODE_6_MONTH_102 Then
+        InferNextOpenDate = GetNextSecondWednesday(baselineDate)
     ElseIf IsEmpty(anchorDate) Then
         InferNextOpenDate = Empty
     Else
@@ -471,11 +478,34 @@ Private Function GetNextMonthEndWednesday(ByVal baselineDate As Date) As Date
     End If
 End Function
 
-Private Function BuildInferenceNote(ByVal intervalDays As Long) As String
+Private Function GetSecondWednesdayOfMonth(ByVal targetDate As Date) As Date
+    Dim firstDay As Date
+    firstDay = DateSerial(Year(targetDate), Month(targetDate), 1)
+
+    Dim daysToFirstWednesday As Long
+    daysToFirstWednesday = 3 - Weekday(firstDay, vbMonday)
+    If daysToFirstWednesday < 0 Then daysToFirstWednesday = daysToFirstWednesday + 7
+    GetSecondWednesdayOfMonth = DateAdd("d", daysToFirstWednesday + 7, firstDay)
+End Function
+
+Private Function GetNextSecondWednesday(ByVal baselineDate As Date) As Date
+    Dim currentMonthWednesday As Date
+    currentMonthWednesday = GetSecondWednesdayOfMonth(baselineDate)
+
+    If currentMonthWednesday > DateOnly(baselineDate) Then
+        GetNextSecondWednesday = currentMonthWednesday
+    Else
+        GetNextSecondWednesday = GetSecondWednesdayOfMonth(DateAdd("m", 1, baselineDate))
+    End If
+End Function
+
+Private Function BuildInferenceNote(ByVal intervalDays As Long, ByVal trustCode As String) As String
     If intervalDays = 7 Then
         BuildInferenceNote = "周开规则：取下一周周三"
-    ElseIf intervalDays = 183 Then
-        BuildInferenceNote = "183日特殊规则：取本月或下月最后一个周三"
+    ElseIf intervalDays = 183 And trustCode = PRODUCT_CODE_6_MONTH_101 Then
+        BuildInferenceNote = "6个月101特殊规则：取本月或下月最后一个周三；如遇节假日请顺延后确认"
+    ElseIf intervalDays = 183 And trustCode = PRODUCT_CODE_6_MONTH_102 Then
+        BuildInferenceNote = "6个月102特殊规则：取本月或下月第二个周三；如遇节假日请顺延后确认"
     Else
         BuildInferenceNote = "从最近已知开放日起按" & intervalDays & "个自然日滚动"
     End If
